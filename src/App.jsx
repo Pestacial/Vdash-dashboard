@@ -172,19 +172,14 @@ export default function App() {
       list.sort((a, b) => {
         let va = a[sortCol] ?? "";
         let vb = b[sortCol] ?? "";
-    if (sortCol === "severity") {
-      va = SEVERITY_ORDER[a.severity] ?? 9;
-      vb = SEVERITY_ORDER[b.severity] ?? 9;
-      return sortDir === "asc" ? va - vb : vb - va;
-    }
-    if (sortCol === "id") {
-      return sortDir === "asc"
-        ? vb.toString().localeCompare(va.toString())
-        : va.toString().localeCompare(vb.toString());
-    }
-    return sortDir === "asc"
-      ? va.toString().localeCompare(vb.toString())
-      : vb.toString().localeCompare(va.toString());
+        if (sortCol === "severity") {
+          va = SEVERITY_ORDER[a.severity] ?? 9;
+          vb = SEVERITY_ORDER[b.severity] ?? 9;
+          return sortDir === "asc" ? va - vb : vb - va;
+        }
+        return sortDir === "asc"
+          ? va.toString().localeCompare(vb.toString())
+          : vb.toString().localeCompare(va.toString());
       });
     } else {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
@@ -251,8 +246,8 @@ export default function App() {
 
   // ── Grid columns ───────────────────────────────────────────────────────
   const gridCols = isBase
-    ? "0.8fr 2.5fr 1.2fr 0.8fr 0.8fr" //? "100px minmax(0,1fr) 190px 110px 140px"
-    : "0.8fr 2.5fr 1.2fr 0.8fr"; //: "100px minmax(0,1fr) 190px 110px";
+    ? "120px 1fr 200px 110px 110px"
+    : "120px 1fr 200px 110px";
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
@@ -263,7 +258,7 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 200,
         background: T.surface, borderBottom: `1px solid ${T.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 28px", height: 52,
+        padding: "0 8px", height: 52,
         boxShadow: darkMode ? "0 2px 20px #00000060" : "0 2px 10px #0000001a",
       }}>
         {/* Left */}
@@ -327,7 +322,7 @@ export default function App() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: "16px 10px", maxWidth: "100%", boxSizing: "border-box" }}>
+      <div style={{ padding: "16px 4px", maxWidth: "100%", boxSizing: "border-box" }}>
 
         {/* Loading / error state */}
         {baseLoading && activeView === "base" && (
