@@ -246,11 +246,11 @@ export default function App() {
 
   // ── Grid columns ───────────────────────────────────────────────────────
   const gridCols = isBase
-    ? "120px 1fr 200px 110px 110px"
-    : "120px 1fr 200px 110px";
+    ? "110px minmax(300px, 1fr) 160px 110px 100px"
+    : "110px minmax(300px, 1fr) 160px 110px";
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", width: "100vw", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
       {/* ── Topbar ── */}
@@ -322,7 +322,7 @@ export default function App() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: "16px 4px", maxWidth: "100%", boxSizing: "border-box" }}>
+      <div style={{ padding: "16px 12px", width: "100%", boxSizing: "border-box" }}>
 
         {/* Loading / error state */}
         {baseLoading && activeView === "base" && (
@@ -369,7 +369,7 @@ export default function App() {
 
         {/* ── Table ── */}
         {!baseLoading && (
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", width: "100%" }}>
             {/* Header row */}
             <div style={{
               display: "grid", gridTemplateColumns: gridCols,
