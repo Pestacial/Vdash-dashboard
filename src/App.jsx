@@ -172,14 +172,19 @@ export default function App() {
       list.sort((a, b) => {
         let va = a[sortCol] ?? "";
         let vb = b[sortCol] ?? "";
-        if (sortCol === "severity") {
-          va = SEVERITY_ORDER[a.severity] ?? 9;
-          vb = SEVERITY_ORDER[b.severity] ?? 9;
-          return sortDir === "asc" ? va - vb : vb - va;
-        }
-        return sortDir === "asc"
-          ? va.toString().localeCompare(vb.toString())
-          : vb.toString().localeCompare(va.toString());
+    if (sortCol === "severity") {
+      va = SEVERITY_ORDER[a.severity] ?? 9;
+      vb = SEVERITY_ORDER[b.severity] ?? 9;
+      return sortDir === "asc" ? va - vb : vb - va;
+    }
+    if (sortCol === "id") {
+      return sortDir === "asc"
+        ? vb.toString().localeCompare(va.toString())
+        : va.toString().localeCompare(vb.toString());
+    }
+    return sortDir === "asc"
+      ? va.toString().localeCompare(vb.toString())
+      : vb.toString().localeCompare(va.toString());
       });
     } else {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
