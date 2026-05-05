@@ -185,7 +185,7 @@ export default function App() {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     }
     return list;
-  }, [vulns, severityFilter, searchQuery]);
+  }, [vulns, severityFilter, searchQuery, sortCol, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -394,17 +394,17 @@ export default function App() {
                       cursor: col ? "pointer" : "default",
                       userSelect: "none",
                     }}>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, color: isActive ? T.accent : T.subtext,
-                      textTransform: "uppercase", letterSpacing: 1.5,
-                      fontFamily: "'DM Mono', monospace",
-                    }}>{label}</span>
                     {col && (
                       <span style={{ display: "flex", flexDirection: "column", gap: 1, lineHeight: 1 }}>
                         <span style={{ fontSize: 8, color: upActive ? T.accent : T.subtext, lineHeight: 1 }}>▲</span>
                         <span style={{ fontSize: 8, color: downActive ? T.accent : T.subtext, lineHeight: 1 }}>▼</span>
                       </span>
                     )}
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: isActive ? T.accent : T.subtext,
+                      textTransform: "uppercase", letterSpacing: 1.5,
+                      fontFamily: "'DM Mono', monospace",
+                    }}>{label}</span>
                   </div>
                 );
               })}
