@@ -1,7 +1,37 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 
-// ── Parser: works on both base report and uploaded reports ─────────────────
+// ── Parser: handles simple HTML table AND scan2html (i9=[...]) formats ──────
 function parseTrivyHtml(html) {
+  // ── Format 1: scan2html — extract i9=[...] embedded JSON ──────────────
+  const scan2htmlMatch = html.match(/i9=(\[\s*\{[\s\S]*?\}\s*\])\s*[,;]/);
+  if (scan2htmlMatch) {
+    try {
+      const data = JSON.parse(scan2htmlMatch[1]);
+      const vulns = [];
+      data.forEach((report) => {
+        if (!report.Results) return;
+        report.Results.forEach((result) => {
+          if (!result.Vulnerabilities) return;
+          result.Vulnerabilities.forEach((v) => {
+            if (!v.VulnerabilityID) return;
+            vulns.push({
+              severity: (v.Severity || "UNKNOWN").toUpperCase(),
+              id: v.VulnerabilityID,
+              pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+              title: v.Title || v.VulnerabilityID,
+              target: result.Target || "",
+              fixedVersion: v.FixedVersion || "",
+            });
+          });
+        });
+      });
+      if (vulns.length > 0) return vulns;
+    } catch (e) {
+      console.warn("scan2html parse failed, falling back", e);
+    }
+  }
+
+  // ── Format 2: simple HTML table (Severity | ID | Package | Title) ─────
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const rows = doc.querySelectorAll("table tr");
@@ -14,7 +44,7 @@ function parseTrivyHtml(html) {
     const pkg = cells[2]?.textContent?.trim();
     const title = cells[3]?.textContent?.trim();
     if (!severity || !id) return;
-    vulns.push({ severity, id, pkg, title });
+    vulns.push({ severity, id, pkg, title, target: "", fixedVersion: "" });
   });
   return vulns;
 }
@@ -95,6 +125,8 @@ export default function App() {
   const [page, setPage]                 = useState(1);
   const [baseLoading, setBaseLoading]   = useState(true);
   const [baseError, setBaseError]       = useState(false);
+  const [sortCol, setSortCol]           = useState(null); // "severity"|"id"|"pkg"|"title"
+  const [sortDir, setSortDir]           = useState(null); // "asc"|"desc"|null
   const fileRef = useRef();
 
   // Load base report from public/
@@ -117,7 +149,7 @@ export default function App() {
   const vulns = activeView === "base" ? baseVulns : (uploadedVulns || []);
 
   // Reset page on filter/search/view change
-  useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize]);
+  useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
 
   const counts = useMemo(() => {
     const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, NEGLIGIBLE: 0 };
@@ -136,7 +168,22 @@ export default function App() {
         v.title?.toLowerCase().includes(q)
       );
     }
-    list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
+    if (sortCol && sortDir) {
+      list.sort((a, b) => {
+        let va = a[sortCol] ?? "";
+        let vb = b[sortCol] ?? "";
+        if (sortCol === "severity") {
+          va = SEVERITY_ORDER[a.severity] ?? 9;
+          vb = SEVERITY_ORDER[b.severity] ?? 9;
+          return sortDir === "asc" ? va - vb : vb - va;
+        }
+        return sortDir === "asc"
+          ? va.toString().localeCompare(vb.toString())
+          : vb.toString().localeCompare(va.toString());
+      });
+    } else {
+      list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
+    }
     return list;
   }, [vulns, severityFilter, searchQuery]);
 
@@ -157,6 +204,12 @@ export default function App() {
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  const handleSort = (col) => {
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else if (sortDir === "desc") { setSortCol(null); setSortDir(null); }
   };
 
   const cycleStatus = (e, key) => {
@@ -271,24 +324,6 @@ export default function App() {
       {/* ── Content ── */}
       <div style={{ padding: "24px 28px", maxWidth: "100%", boxSizing: "border-box" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
-            Trivy Report — OpenSILEX
-          </h1>
-          <span style={{ fontSize: 12, color: T.subtext }}>
-            {isBase ? "Base · 2026" : `Uploaded · ${uploadedName}`}
-          </span>
-          {!baseLoading && !baseError && (
-            <span style={{
-              background: `${T.accent}20`, color: T.accent,
-              border: `1px solid ${T.accent}44`,
-              borderRadius: 4, padding: "2px 12px", fontSize: 12, fontWeight: 700,
-              fontFamily: "'DM Mono', monospace",
-            }}>{vulns.length} vulns</span>
-          )}
-        </div>
-
         {/* Loading / error state */}
         {baseLoading && activeView === "base" && (
           <div style={{ color: T.subtext, fontSize: 13, padding: 40, textAlign: "center" }}>
@@ -341,15 +376,38 @@ export default function App() {
               gap: 12, padding: "10px 18px",
               background: T.surface2, borderBottom: `1px solid ${T.border}`,
             }}>
-              {["Severity", "Title / Package", "CVE / ID", "Status",
-                ...(isBase ? ["Remediation"] : [])
-              ].map((h) => (
-                <span key={h} style={{
-                  fontSize: 10, fontWeight: 700, color: T.subtext,
-                  textTransform: "uppercase", letterSpacing: 1.5,
-                  fontFamily: "'DM Mono', monospace",
-                }}>{h}</span>
-              ))}
+              {[
+                { label: "Severity", col: "severity" },
+                { label: "Title / Package", col: "title" },
+                { label: "CVE / ID", col: "id" },
+                { label: "Status", col: null },
+                ...(isBase ? [{ label: "Remediation", col: null }] : []),
+              ].map(({ label, col }) => {
+                const isActive = sortCol === col && col !== null;
+                const upActive = isActive && sortDir === "asc";
+                const downActive = isActive && sortDir === "desc";
+                return (
+                  <div key={label}
+                    onClick={() => col && handleSort(col)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      cursor: col ? "pointer" : "default",
+                      userSelect: "none",
+                    }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: isActive ? T.accent : T.subtext,
+                      textTransform: "uppercase", letterSpacing: 1.5,
+                      fontFamily: "'DM Mono', monospace",
+                    }}>{label}</span>
+                    {col && (
+                      <span style={{ display: "flex", flexDirection: "column", gap: 1, lineHeight: 1 }}>
+                        <span style={{ fontSize: 8, color: upActive ? T.accent : T.subtext, lineHeight: 1 }}>▲</span>
+                        <span style={{ fontSize: 8, color: downActive ? T.accent : T.subtext, lineHeight: 1 }}>▼</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Data rows */}
