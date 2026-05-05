@@ -246,11 +246,11 @@ export default function App() {
 
   // ── Grid columns ───────────────────────────────────────────────────────
   const gridCols = isBase
-    ? "110px minmax(300px, 1fr) 160px 110px 100px"
-    : "110px minmax(300px, 1fr) 160px 110px";
+    ? "110px minmax(0, 1fr) 180px 100px 100px"
+    : "110px minmax(0, 1fr) 180px 100px";
 
   return (
-    <div style={{ minHeight: "100vh", width: "100vw", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", width: "100%", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
       {/* ── Topbar ── */}
@@ -341,7 +341,7 @@ export default function App() {
 
         {/* ── Severity pills ── */}
         {!baseLoading && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",       label: `All (${vulns.length})` },
               { key: "CRITICAL",  label: `Critical (${counts.CRITICAL})` },
