@@ -251,8 +251,8 @@ export default function App() {
 
   // ── Grid columns ───────────────────────────────────────────────────────
   const gridCols = isBase
-    ? "100px minmax(0,1fr) 190px 110px 140px"
-    : "100px minmax(0,1fr) 190px 110px";
+    ? "0.8fr 2.5fr 1.2fr 0.8fr 0.8fr" //? "100px minmax(0,1fr) 190px 110px 140px"
+    : "0.8fr 2.5fr 1.2fr 0.8fr"; //: "100px minmax(0,1fr) 190px 110px";
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
@@ -327,7 +327,7 @@ export default function App() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: "24px 28px", maxWidth: "100%", boxSizing: "border-box" }}>
+      <div style={{ padding: "16px 10px", maxWidth: "100%", boxSizing: "border-box" }}>
 
         {/* Loading / error state */}
         {baseLoading && activeView === "base" && (
