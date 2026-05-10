@@ -221,6 +221,13 @@ export default function App() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  // ── Base CVE+pkg set for diff comparison ──────────────────────────────
+  const baseIdSet = useMemo(() => {
+    const s = new Set();
+    baseVulns.forEach((v) => s.add(`${v.id}|${v.pkg}`));
+    return s;
+  }, [baseVulns]);
+
   const handleUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -453,6 +460,7 @@ export default function App() {
               const status = patchStatus[key] || "open";
               const isExp = expandedRow === key;
               const isPatched = status === "patched";
+              const isNew = !isBase && !baseIdSet.has(key);
               const rowBg = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
 
               return (
@@ -474,8 +482,18 @@ export default function App() {
 
                     {/* Title + package */}
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4, marginBottom: 3 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4, marginBottom: 3, display: "flex", alignItems: "center", gap: 8 }}>
                         {v.title}
+                        {isNew && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 800, letterSpacing: 1.2,
+                            background: "#0ea5e9", color: "#fff",
+                            padding: "2px 7px", borderRadius: 3,
+                            fontFamily: "'DM Mono', monospace",
+                            boxShadow: "0 0 8px #0ea5e955",
+                            whiteSpace: "nowrap", flexShrink: 0,
+                          }}>NEW</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
                         {v.pkg}
