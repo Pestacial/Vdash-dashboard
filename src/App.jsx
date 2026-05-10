@@ -188,6 +188,13 @@ export default function App() {
     return c;
   }, [vulns]);
 
+  // ── Base CVE+pkg set for diff comparison ──────────────────────────────
+  const baseIdSet = useMemo(() => {
+    const s = new Set();
+    baseVulns.forEach((v) => s.add(`${v.id}|${v.pkg}`));
+    return s;
+  }, [baseVulns]);
+
   const filtered = useMemo(() => {
     let list = [...vulns];
     if (severityFilter === "NEW") list = list.filter((v) => !baseIdSet.has(`${v.id}|${v.pkg}`));
@@ -217,17 +224,10 @@ export default function App() {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     }
     return list;
-  }, [vulns, severityFilter, searchQuery, sortCol, sortDir]);
+  }, [vulns, severityFilter, searchQuery, sortCol, sortDir, baseIdSet]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  // ── Base CVE+pkg set for diff comparison ──────────────────────────────
-  const baseIdSet = useMemo(() => {
-    const s = new Set();
-    baseVulns.forEach((v) => s.add(`${v.id}|${v.pkg}`));
-    return s;
-  }, [baseVulns]);
 
   const handleUpload = (e) => {
     const file = e.target.files[0];
@@ -238,6 +238,22 @@ export default function App() {
       const content = ev.target.result;
       const isJson = file.name.toLowerCase().endsWith(".json");
       const parsed = isJson ? parseTrivyJson(content) : parseTrivyHtml(content);
+
+      // Build a set of CVE+pkg keys from the uploaded report
+      const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${v.pkg}`));
+
+      // Auto-mark base vulns not present in the uploaded report as patched
+      setPatchStatus((prev) => {
+        const updated = { ...prev };
+        baseVulns.forEach((v) => {
+          const key = `${v.id}|${v.pkg}`;
+          if (!uploadedKeys.has(key) && !prev[key]) {
+            updated[key] = "patched";
+          }
+        });
+        return updated;
+      });
+
       setUploadedVulns(parsed);
       setActiveView("uploaded");
       setSeverityFilter("ALL");
