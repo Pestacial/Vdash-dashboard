@@ -197,7 +197,10 @@ export default function App() {
 
   const filtered = useMemo(() => {
     let list = [...vulns];
-    if (severityFilter === "NEW") list = list.filter((v) => !baseIdSet.has(`${v.id}|${v.pkg}`));
+    if (severityFilter === "NEW") list = list.filter((v) => {
+        const key = `${v.id}|${v.pkg}`;
+        return !baseIdSet.has(key) && (patchStatus[key] || "open") !== "patched";
+      });
     else if (severityFilter !== "ALL") list = list.filter((v) => v.severity === severityFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -224,7 +227,7 @@ export default function App() {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     }
     return list;
-  }, [vulns, severityFilter, searchQuery, sortCol, sortDir, baseIdSet]);
+  }, [vulns, severityFilter, searchQuery, sortCol, sortDir, baseIdSet, patchStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -401,7 +404,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",       label: `All (${vulns.length})` },
-              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => !baseIdSet.has(`${v.id}|${v.pkg}`)).length})` }] : []),
+              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => { const k = `${v.id}|${v.pkg}`; return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched"; }).length})` }] : []),
               { key: "CRITICAL",  label: `Critical (${counts.CRITICAL})` },
               { key: "HIGH",      label: `High (${counts.HIGH})` },
               { key: "MEDIUM",    label: `Medium (${counts.MEDIUM})` },
