@@ -1,5 +1,36 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 
+// ── Parser: Trivy JSON format ─────────────────────────────────────────────
+function parseTrivyJson(text) {
+  try {
+    const data = JSON.parse(text);
+    const vulns = [];
+    // Support both single report {Results:[]} and array of reports [{Results:[]}]
+    const reports = Array.isArray(data) ? data : [data];
+    reports.forEach((report) => {
+      if (!report.Results) return;
+      report.Results.forEach((result) => {
+        if (!result.Vulnerabilities) return;
+        result.Vulnerabilities.forEach((v) => {
+          if (!v.VulnerabilityID) return;
+          vulns.push({
+            severity: (v.Severity || "UNKNOWN").toUpperCase(),
+            id: v.VulnerabilityID,
+            pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+            title: v.Title || v.VulnerabilityID,
+            target: result.Target || "",
+            fixedVersion: v.FixedVersion || "",
+          });
+        });
+      });
+    });
+    return vulns;
+  } catch (e) {
+    console.warn("JSON parse failed", e);
+    return [];
+  }
+}
+
 // ── Parser: handles simple HTML table AND scan2html (i9=[...]) formats ──────
 function parseTrivyHtml(html) {
   // ── Format 1: scan2html — extract i9=[...] embedded JSON ──────────────
@@ -196,7 +227,9 @@ export default function App() {
     setUploadedName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const parsed = parseTrivyHtml(ev.target.result);
+      const content = ev.target.result;
+      const isJson = file.name.toLowerCase().endsWith(".json");
+      const parsed = isJson ? parseTrivyJson(content) : parseTrivyHtml(content);
       setUploadedVulns(parsed);
       setActiveView("uploaded");
       setSeverityFilter("ALL");
@@ -311,7 +344,7 @@ export default function App() {
             <option value={50}>50 entries</option>
             <option value={100}>100 entries</option>
           </select>
-          <input ref={fileRef} type="file" accept=".html,.xml" style={{ display: "none" }} onChange={handleUpload} />
+          <input ref={fileRef} type="file" accept=".html,.json" style={{ display: "none" }} onChange={handleUpload} />
           <button onClick={() => fileRef.current.click()} style={{
             background: T.accent, color: "#fff", border: "none",
             padding: "6px 18px", borderRadius: 6, cursor: "pointer",
