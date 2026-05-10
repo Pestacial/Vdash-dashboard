@@ -151,7 +151,7 @@ export default function App() {
   const [searchQuery, setSearchQuery]   = useState("");
   const [patchStatus, setPatchStatus]   = useState({});
   const [expandedRow, setExpandedRow]   = useState(null);
-  const [darkMode, setDarkMode]         = useState(true);
+  const [darkMode, setDarkMode]         = useState(false);
   const [pageSize, setPageSize]         = useState(20);
   const [page, setPage]                 = useState(1);
   const [baseLoading, setBaseLoading]   = useState(true);
@@ -190,7 +190,8 @@ export default function App() {
 
   const filtered = useMemo(() => {
     let list = [...vulns];
-    if (severityFilter !== "ALL") list = list.filter((v) => v.severity === severityFilter);
+    if (severityFilter === "NEW") list = list.filter((v) => !baseIdSet.has(`${v.id}|${v.pkg}`));
+    else if (severityFilter !== "ALL") list = list.filter((v) => v.severity === severityFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((v) =>
@@ -384,6 +385,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",       label: `All (${vulns.length})` },
+              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => !baseIdSet.has(`${v.id}|${v.pkg}`)).length})` }] : []),
               { key: "CRITICAL",  label: `Critical (${counts.CRITICAL})` },
               { key: "HIGH",      label: `High (${counts.HIGH})` },
               { key: "MEDIUM",    label: `Medium (${counts.MEDIUM})` },
@@ -392,15 +394,16 @@ export default function App() {
             ].map(({ key, label }) => {
               const active = severityFilter === key;
               const sev = SEV_STYLE[key];
+              const isNewBtn = key === "NEW";
               return (
                 <button key={key} onClick={() => setSeverityFilter(key)} style={{
-                  background: active ? (sev?.bg || T.accent) : T.surface2,
+                  background: active ? (isNewBtn ? "#0ea5e9" : (sev?.bg || T.accent)) : T.surface2,
                   color: active ? "#fff" : T.subtext,
-                  border: `1px solid ${active ? (sev?.bg || T.accent) : T.border}`,
+                  border: `1px solid ${active ? (isNewBtn ? "#0ea5e9" : (sev?.bg || T.accent)) : T.border}`,
                   padding: "5px 16px", borderRadius: 20,
                   cursor: "pointer", fontSize: 12, fontWeight: 600,
                   fontFamily: "inherit", transition: "all 0.18s",
-                  boxShadow: active && sev ? `0 0 10px ${sev.glow}` : "none",
+                  boxShadow: active ? (isNewBtn ? "0 0 10px #0ea5e955" : (sev ? `0 0 10px ${sev.glow}` : "none")) : "none",
                 }}>{label}</button>
               );
             })}
