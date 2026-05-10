@@ -1,6 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 
-// ── Parser: Trivy JSON format ─────────────────────────────────────────────
+// ── Normalize pkg string for consistent key matching ─────────────────────
+function normalizePkg(pkg) {
+  // Remove epoch prefix e.g. "1:2.39.3" → "2.39.3" for consistent matching
+  return pkg.replace(/\((\d+):/, "(");
+}
 function parseTrivyJson(text) {
   try {
     const data = JSON.parse(text);
@@ -191,14 +195,14 @@ export default function App() {
   // ── Base CVE+pkg set for diff comparison ──────────────────────────────
   const baseIdSet = useMemo(() => {
     const s = new Set();
-    baseVulns.forEach((v) => s.add(`${v.id}|${v.pkg}`));
+    baseVulns.forEach((v) => s.add(`${v.id}|${normalizePkg(v.pkg)}`));
     return s;
   }, [baseVulns]);
 
   const filtered = useMemo(() => {
     let list = [...vulns];
     if (severityFilter === "NEW") list = list.filter((v) => {
-        const key = `${v.id}|${v.pkg}`;
+        const key = `${v.id}|${normalizePkg(v.pkg)}`;
         return !baseIdSet.has(key) && (patchStatus[key] || "open") !== "patched";
       });
     else if (severityFilter !== "ALL") list = list.filter((v) => v.severity === severityFilter);
@@ -243,13 +247,13 @@ export default function App() {
       const parsed = isJson ? parseTrivyJson(content) : parseTrivyHtml(content);
 
       // Build a set of CVE+pkg keys from the uploaded report
-      const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${v.pkg}`));
+      const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${normalizePkg(v.pkg)}`));
 
       // Auto-mark base vulns not present in the uploaded report as patched
       setPatchStatus((prev) => {
         const updated = { ...prev };
         baseVulns.forEach((v) => {
-          const key = `${v.id}|${v.pkg}`;
+          const key = `${v.id}|${normalizePkg(v.pkg)}`;
           if (!uploadedKeys.has(key) && !prev[key]) {
             updated[key] = "patched";
           }
@@ -404,7 +408,7 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",       label: `All (${vulns.length})` },
-              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => { const k = `${v.id}|${v.pkg}`; return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched"; }).length})` }] : []),
+              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => { const k = `${v.id}|${normalizePkg(v.pkg)}`; return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched"; }).length})` }] : []),
               { key: "CRITICAL",  label: `Critical (${counts.CRITICAL})` },
               { key: "HIGH",      label: `High (${counts.HIGH})` },
               { key: "MEDIUM",    label: `Medium (${counts.MEDIUM})` },
@@ -478,11 +482,11 @@ export default function App() {
                 No vulnerabilities match the current filter.
               </div>
             ) : paginated.map((v, i) => {
-              const key = `${v.id}|${v.pkg}`;
+              const key = `${v.id}|${normalizePkg(v.pkg)}`;
               const status = patchStatus[key] || "open";
               const isExp = expandedRow === key;
               const isPatched = status === "patched";
-              const isNew = !isBase && !baseIdSet.has(key);
+              const isNew = !isBase && !baseIdSet.has(key) && status !== "patched";
               const rowBg = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
 
               return (
