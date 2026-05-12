@@ -328,7 +328,7 @@ export default function App() {
         {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, color: T.accent, letterSpacing: 2 }}>
-            ▸ TRIVYDASH
+            ▸ VULNDASH
           </span>
           <div style={{ width: 1, height: 24, background: T.border }} />
           <button onClick={() => { setActiveView("base"); setSeverityFilter("ALL"); setSearchQuery(""); }}
