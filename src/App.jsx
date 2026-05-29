@@ -6,9 +6,8 @@ const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
 const AI_MODELS = [
-  "deepseek/deepseek-v4-flash:free",          // Primary: 1M context, 284B params, excellent JSON
-  "nvidia/nemotron-3-super:free",              // Fallback 1: 1M context, 120B MoE, agentic
-  "openai/gpt-oss-120b:free",                 // Fallback 2: 117B, native structured output
+  "openai/gpt-oss-120b:free",
+  "minimax/minimax-m2.5:free", //fallback
 ];
 
 // Builds a LEAN prompt — only essential fields, no redundant data
@@ -20,13 +19,13 @@ function buildAiPrompt(vulns) {
   );
   const jarVulns = vulns.filter(
     (v) => (v.target && v.target.toLowerCase().includes("java")) ||
-            (v.pkg && v.pkg.toLowerCase().endsWith(".jar"))
+            (v.pkg && v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim().toLowerCase().endsWith(".jar"))
   );
 
   // For deb packages: only send id, pkg, fixedVersion — nothing else
   const debItems = debVulns.map((v) => ({
     id:  v.id,
-    pkg: v.pkg,
+    pkg: v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim(), // strip " (version)" suffix
     fix: v.fixedVersion || "",
   }));
 
@@ -61,7 +60,7 @@ async function callAi(vulns) {
   // Build jar not_fixable entries locally — no AI call needed
   const jarNotFixable = jarVulns.map((v) => ({
     id:     v.id,
-    pkg:    v.pkg,
+    pkg:    v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim(),
     reason: "requires_rebuild",
     note:   "Java library inside opensilex.jar — requires source code rebuild to update.",
   }));
@@ -88,6 +87,11 @@ async function callAi(vulns) {
       if (response.status === 429) {
         console.warn(`[AI] ${model} rate limited, trying next...`);
         continue;
+      if (response.status === 429) {
+        console.warn(`[AI] ${model} rate limited, waiting 4s then trying next...`);
+        await new Promise(r => setTimeout(r, 4000));
+        continue;
+}
       }
       if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${await response.text()}`);
 
@@ -468,7 +472,8 @@ export default function App() {
     }
     setAiLoading(true);
     setAiError("");
-    setAiResult(null);
+    // don't wipe previous result until new one arrives — keeps panel readable if user re-clicks
+    // setAiResult(null);  // removed: result now only clears when new data comes in
     setAiPanelOpen(true);
     setBackupStatus(null);
     setRemediateStatus(null);
