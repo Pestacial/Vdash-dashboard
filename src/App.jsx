@@ -28,6 +28,8 @@ function buildAiPrompt(vulns) {
     pkg: v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim(), // strip " (version)" suffix
     fix: v.fixedVersion || "",
   }));
+  console.log("[AI] debVulns count:", debVulns.length, "jarVulns count:", jarVulns.length);
+  console.log("[AI] sample debItem:", JSON.stringify(debItems.slice(0, 3), null, 2));
 
   return {
     debItems,
@@ -97,6 +99,7 @@ async function callAi(vulns) {
 
       const data   = await response.json();
       let text     = data.choices?.[0]?.message?.content || "";
+      console.log("[AI] RAW RESPONSE (first 1000 chars):", text.slice(0, 1000));
       const usage  = data.usage;
       console.log(`[AI] ${model} — tokens: prompt=${usage?.prompt_tokens} completion=${usage?.completion_tokens} total=${usage?.total_tokens}`);
 
