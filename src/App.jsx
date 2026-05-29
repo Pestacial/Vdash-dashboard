@@ -62,47 +62,74 @@ Vulnerabilities to analyze:
 ${JSON.stringify(items, null, 2)}`;
 }
 
-// Calls OpenRouter (Gemini primary, Llama fallback on rate limit)
+// ── callAi: tries primary model, falls back to secondary on rate limit ────────
 async function callAi(prompt) {
   for (let i = 0; i < AI_MODELS.length; i++) {
     const model = AI_MODELS[i];
     try {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method:  "POST",
+        method: "POST",
         headers: {
-          "Content-Type":  "application/json",
+          "Content-Type": "application/json",
           "Authorization": `Bearer ${OPENROUTER_KEY}`,
-          "HTTP-Referer":  "https://github.com/vuln-dashboard",
-          "X-Title":       "PHIS Vuln Dashboard",
+          "HTTP-Referer": "https://github.com/Pestacial/vuln-dashboard",
+          "X-Title": "PHIS Vuln Dashboard",
         },
         body: JSON.stringify({
-          model,
-          max_tokens: 4000,
-          messages:   [{ role: "user", content: prompt }],
+          model: model,
+          max_tokens: 8000, // Increased from 4000 to avoid truncation
+          messages: [{ role: "user", content: prompt }],
+          // Force JSON output format (supported by Gemini & Llama via OpenRouter)
+          response_format: { type: "json_object" },
         }),
       });
 
+      // Rate limited — try next model
       if (response.status === 429) {
-        console.warn(`[AI] ${model} rate-limited, trying fallback...`);
+        console.warn(`[AI] ${model} rate limited, trying next model...`);
         continue;
       }
+
       if (!response.ok) {
-        throw new Error(`OpenRouter ${response.status}: ${await response.text()}`);
+        const errText = await response.text();
+        throw new Error(`OpenRouter ${response.status}: ${errText}`);
       }
 
-      const data    = await response.json();
-      const text    = data.choices?.[0]?.message?.content || "";
-      const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      const parsed  = JSON.parse(cleaned);
+      const data = await response.json();
+      let text = data.choices?.[0]?.message?.content || "";
+
+      // Debug: log raw response if parsing fails later
+      // console.log("[AI] Raw response:", text.slice(0, 500) + "...");
+
+      // Strip markdown code fences (FIXED: use THREE backticks, not one)
+      text = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      
+      // Also strip any leading/trailing non-JSON text (common with some models)
+      const jsonStart = text.indexOf("{");
+      const jsonEnd = text.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        text = text.slice(jsonStart, jsonEnd + 1);
+      }
+
+      const parsed = JSON.parse(text);
       parsed._modelUsed = model;
       return parsed;
 
     } catch (err) {
-      if (i === AI_MODELS.length - 1) throw err;
+      // Log the raw response for debugging if this is the last model
+      if (i === AI_MODELS.length - 1) {
+        console.error("[AI] Final parse error. Raw response preview:", 
+          (await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENROUTER_KEY}` },
+            body: JSON.stringify({ model, max_tokens: 200, messages: [{ role: "user", content: "test" }] }
+          }).then(r => r.json()).then(d => d.choices?.[0]?.message?.content || "").catch(() => "N/A")));
+        throw new Error(`JSON parse failed: ${err.message}. The AI may have returned malformed output. Try again or switch models.`);
+      }
       console.warn(`[AI] ${model} failed (${err.message}), trying fallback...`);
     }
   }
-  throw new Error("All AI models failed. Try again in a few minutes.");
+  throw new Error("All AI models failed or are rate limited. Try again in a few minutes.");
 }
 
 // Calls the Kali agent's /explain-local endpoint which calls Ollama
