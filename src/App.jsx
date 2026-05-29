@@ -6,8 +6,9 @@ const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
 const AI_MODELS = [
-  "openai/gpt-oss-120b:free",
-  "minimax/minimax-m2.5:free", //fallback
+  "openai/gpt-oss-120b:free",           // 131K context, works confirmed
+  "nvidia/nemotron-3-super-120b-a12b:free", // 120B MoE, strong instruction following
+  "meta-llama/llama-3.3-70b-instruct:free", // reliable fallback, good at JSON
 ];
 
 // Builds a LEAN prompt — only essential fields, no redundant data
@@ -1054,7 +1055,7 @@ export default function App() {
               {aiLoading && (
                 <div style={{ textAlign: "center", padding: "48px 0", color: T.subtext }}>
                   <div style={{ fontSize: 32, animation: "ai-spin 1.5s linear infinite", display: "inline-block", marginBottom: 16 }}>⟳</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 6 }}>Sending report to Gemini…</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 6 }}>Sending report…</div>
                   <div style={{ fontSize: 12 }}>Analyzing {vulns.length} vulnerabilities. This takes 10–25 seconds.</div>
                 </div>
               )}
