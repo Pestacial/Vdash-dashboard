@@ -6,9 +6,7 @@ const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
 const AI_MODELS = [
-  "openai/gpt-oss-120b:free",           // 131K context, works confirmed
-  "nvidia/nemotron-3-super-120b-a12b:free", // 120B MoE, strong instruction following
-  "meta-llama/llama-3.3-70b-instruct:free", // reliable fallback, good at JSON
+  "deepseek/deepseek-v4-flash:free", // 1M context, fast MoE, great at JSON + agent workflows
 ];
 
 // Builds a LEAN prompt — only essential fields, no redundant data
@@ -81,20 +79,16 @@ async function callAi(vulns) {
         },
         body: JSON.stringify({
           model,
-          max_tokens: 8000,
+          max_tokens: 4096,
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
         }),
       });
 
       if (response.status === 429) {
-        console.warn(`[AI] ${model} rate limited, trying next...`);
-        continue;
-      if (response.status === 429) {
-        console.warn(`[AI] ${model} rate limited, waiting 4s then trying next...`);
+        console.warn(`[AI] ${model} rate limited, waiting 4s then retrying...`);
         await new Promise(r => setTimeout(r, 4000));
         continue;
-}
       }
       if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${await response.text()}`);
 
@@ -127,11 +121,10 @@ async function callAi(vulns) {
       return parsed;
 
     } catch (err) {
-      if (i === AI_MODELS.length - 1) throw err;
-      console.warn(`[AI] ${model} failed (${err.message}), trying fallback...`);
+      throw err;
     }
   }
-  throw new Error("All AI models failed. Try again in a few minutes.");
+  throw new Error("AI model failed. Check your VITE_OPENROUTER_KEY and try again.");
 }
 
 // Calls the Kali agent's /explain-local endpoint which calls Ollama
