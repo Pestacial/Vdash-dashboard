@@ -6,8 +6,8 @@ const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
 const AI_MODELS = [
-  "google/gemini-flash-1.5:free", //"google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.1-8b-instruct:free",// "meta-llama/llama-3.3-70b-instruct:free", // auto-fallback if Gemini rate-limited
+  "google/gemini-2.5-flash-lite", //"google/gemini-2.0-flash-exp:free",
+  "meta-llama/llama-3.3-70b-instruct",// "meta-llama/llama-3.3-70b-instruct:free", // auto-fallback if Gemini rate-limited
 ];
 
 // Builds the prompt sent to Gemini with all vulnerabilities
