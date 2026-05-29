@@ -1021,7 +1021,9 @@ export default function App() {
                   </div>
                   <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
                     {vulns.length} vulnerabilities ·{" "}
-                    {aiModelUsed ? `Analyzed by: ${aiModelUsed}` : "Gemini 2.0 Flash (primary) / Llama 3.3 70B (fallback)"}
+                    {aiLoading ? "Analyzing…" : 
+                    aiModelUsed ? `Model: ${aiModelUsed}` : 
+                    `Models: ${AI_MODELS.join(" / ")}`}
                   </div>
                 </div>
               </div>
