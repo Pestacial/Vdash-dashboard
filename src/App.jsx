@@ -5,126 +5,79 @@ const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY || "";
 const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217.28:8000";
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
-const AI_MODELS = [
-  "deepseek/deepseek-v4-flash:free", // 1M context, fast MoE, great at JSON + agent workflows
-];
+// ── Pure deterministic remediation — no AI needed ────────────────────────────
+// The Trivy report already tells us everything:
+//   fixedVersion present  → fixable, generate the apt-get command
+//   fixedVersion absent   → not fixable, no patch exists yet
+//
+// AI was previously used to make this decision, but it's pure logic.
+// The only thing that changes per-vuln is: pkg name + fixed version → one command.
+// We generate that here, instantly, with zero network calls.
 
-// Builds a LEAN prompt — only essential fields, no redundant data
-function buildAiPrompt(vulns) {
-  // Separate deb vs jar up front — jars are always not_fixable
-  const debVulns = vulns.filter(
-    (v) => !(v.target && v.target.toLowerCase().includes("java")) &&
-            !(v.pkg && v.pkg.toLowerCase().endsWith(".jar"))
-  );
-  const jarVulns = vulns.filter(
-    (v) => (v.target && v.target.toLowerCase().includes("java")) ||
-            (v.pkg && v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim().toLowerCase().endsWith(".jar"))
-  );
+function analyzeVulns(vulns) {
+  const isJar = (v) =>
+    (v.target && v.target.toLowerCase().includes("java")) ||
+    (v.pkg && v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim().toLowerCase().endsWith(".jar"));
 
-  // For deb packages: only send id, pkg, fixedVersion — nothing else
-  const debItems = debVulns.map((v) => ({
-    id:  v.id,
-    pkg: v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim(), // strip " (version)" suffix
-    fix: v.fixedVersion || "",
-  }));
-  console.log("[AI] debVulns count:", debVulns.length, "jarVulns count:", jarVulns.length);
-  console.log("[AI] sample debItem:", JSON.stringify(debItems.slice(0, 3), null, 2));
+  const stripVersion = (pkg) => pkg.replace(/\s*\(.*?\)\s*$/, "").trim();
+
+  const debVulns = vulns.filter((v) => !isJar(v));
+  const jarVulns = vulns.filter((v) => isJar(v));
+
+  const fixable     = [];
+  const not_fixable = [];
+
+  // Group fixable deb vulns by package so we emit one apt command per package
+  // even when multiple CVEs affect the same package.
+  const pkgMap = new Map(); // pkgName → { fixedVersion, cves[] }
+
+  for (const v of debVulns) {
+    const pkg = stripVersion(v.pkg);
+    if (v.fixedVersion) {
+      if (!pkgMap.has(pkg)) pkgMap.set(pkg, { fixedVersion: v.fixedVersion, cves: [] });
+      pkgMap.get(pkg).cves.push(v.id);
+    } else {
+      not_fixable.push({ id: v.id, pkg, reason: "no_fix_available" });
+    }
+  }
+
+  // One entry per CVE, but commands are grouped: apt-get update once + one install per pkg
+  const updateCmd = `docker exec ${CONTAINER} apt-get update`;
+  for (const [pkg, { fixedVersion, cves }] of pkgMap) {
+    const installCmd = `docker exec ${CONTAINER} apt-get install -y --only-upgrade ${pkg}=${fixedVersion}`;
+    for (const cveId of cves) {
+      fixable.push({
+        id:       cveId,
+        pkg,
+        commands: [updateCmd, installCmd],
+        risk:     "low",
+      });
+    }
+  }
+
+  // JAR vulns are never auto-fixable — they require a source rebuild
+  for (const v of jarVulns) {
+    not_fixable.push({
+      id:     v.id,
+      pkg:    stripVersion(v.pkg),
+      reason: "requires_rebuild",
+      note:   "Java library inside opensilex.jar — requires source code rebuild to update.",
+    });
+  }
+
+  console.log(`[Remediation] ${fixable.length} fixable, ${not_fixable.length} not fixable (${jarVulns.length} JARs)`);
 
   return {
-    debItems,
-    jarVulns,
-    prompt: `You are a Linux security expert. Fix Ubuntu deb package vulnerabilities in Docker container "${CONTAINER}".
-
-Rules:
-- If "fix" field is empty → not_fixable, reason: "no_fix_available"
-- If "fix" field has a version → fixable with: docker exec ${CONTAINER} apt-get install -y --only-upgrade <pkg>=<fix>
-- Group ALL fixable packages into as few apt-get install commands as possible
-- ALWAYS include apt-get update as the very first command
-- Return ONLY raw JSON — no markdown, no explanation, no text outside the JSON
-
-JSON format (no extra fields):
-{
-  "summary": "X of Y deb vulnerabilities auto-fixable.",
-  "fixable": [{"id":"CVE-X","pkg":"name","commands":["cmd1","cmd2"],"risk":"low"}],
-  "not_fixable": [{"id":"CVE-X","pkg":"name","reason":"no_fix_available"}]
-}
-
-Packages to analyze:
-${JSON.stringify(debItems)}`,
+    _modelUsed: "deterministic (no AI needed)",
+    summary:    `${fixable.length} of ${debVulns.length} deb vulnerabilities can be auto-fixed. ${jarVulns.length} Java JARs require source rebuild.`,
+    fixable,
+    not_fixable,
   };
 }
 
-// Calls OpenRouter — lean prompt, jar packages handled locally (no AI tokens wasted)
-async function callAi(vulns) {
-  const { debItems, jarVulns, prompt } = buildAiPrompt(vulns);
-
-  // Build jar not_fixable entries locally — no AI call needed
-  const jarNotFixable = jarVulns.map((v) => ({
-    id:     v.id,
-    pkg:    v.pkg.replace(/\s*\(.*?\)\s*$/, "").trim(),
-    reason: "requires_rebuild",
-    note:   "Java library inside opensilex.jar — requires source code rebuild to update.",
-  }));
-
-  for (let i = 0; i < AI_MODELS.length; i++) {
-    const model = AI_MODELS[i];
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method:  "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${OPENROUTER_KEY}`,
-          "HTTP-Referer":  "https://github.com/Pestacial/vuln-dashboard",
-          "X-Title":       "PHIS Vuln Dashboard",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 4096,
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (response.status === 429) {
-        console.warn(`[AI] ${model} rate limited, waiting 4s then retrying...`);
-        await new Promise(r => setTimeout(r, 4000));
-        continue;
-      }
-      if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${await response.text()}`);
-
-      const data   = await response.json();
-      let text     = data.choices?.[0]?.message?.content || "";
-      console.log("[AI] RAW RESPONSE (first 1000 chars):", text.slice(0, 1000));
-      const usage  = data.usage;
-      console.log(`[AI] ${model} — tokens: prompt=${usage?.prompt_tokens} completion=${usage?.completion_tokens} total=${usage?.total_tokens}`);
-
-      // Check if response was cut off (finish_reason = "length" means truncated)
-      const finishReason = data.choices?.[0]?.finish_reason;
-      if (finishReason === "length") {
-        console.warn(`[AI] ${model} response truncated (finish_reason=length). Trying fallback...`);
-        continue; // try next model instead of failing with a parse error
-      }
-
-      // Strip markdown fences if present
-      text = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      const jsonStart = text.indexOf("{");
-      const jsonEnd   = text.lastIndexOf("}");
-      if (jsonStart !== -1 && jsonEnd !== -1) text = text.slice(jsonStart, jsonEnd + 1);
-
-      const parsed = JSON.parse(text);
-      parsed._modelUsed = model;
-
-      // Merge jar not_fixable into the AI's not_fixable list
-      parsed.not_fixable = [...(parsed.not_fixable || []), ...jarNotFixable];
-      parsed.summary     = `${(parsed.fixable || []).length} of ${debItems.length} deb vulnerabilities can be auto-fixed. ${jarNotFixable.length} Java JARs require source rebuild.`;
-
-      return parsed;
-
-    } catch (err) {
-      throw err;
-    }
-  }
-  throw new Error("AI model failed. Check your VITE_OPENROUTER_KEY and try again.");
+// callAi is kept as a thin wrapper so the rest of the app doesn't need changes
+function callAi(vulns) {
+  return Promise.resolve(analyzeVulns(vulns));
 }
 
 // Calls the Kali agent's /explain-local endpoint which calls Ollama
@@ -1016,8 +969,8 @@ export default function App() {
                   <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
                     {vulns.length} vulnerabilities ·{" "}
                     {aiLoading ? "Analyzing…" : 
-                    aiModelUsed ? `Model: ${aiModelUsed}` : 
-                    `Models: ${AI_MODELS.join(" / ")}`}
+                    aiModelUsed ? `Method: ${aiModelUsed}` : 
+                    "Ready"}
                   </div>
                 </div>
               </div>
