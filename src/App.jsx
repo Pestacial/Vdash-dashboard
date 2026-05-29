@@ -6,130 +6,124 @@ const AGENT_URL      = import.meta.env.VITE_AGENT_URL      || "http://100.95.217
 const CONTAINER      = "sandbox-opensilex-docker-opensilexapp";
 
 const AI_MODELS = [
-  "google/gemini-2.5-flash-lite", //"google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.3-70b-instruct",// "meta-llama/llama-3.3-70b-instruct:free", // auto-fallback if Gemini rate-limited
+  "deepseek/deepseek-v4-flash:free",          // Primary: 1M context, 284B params, excellent JSON
+  "nvidia/nemotron-3-super:free",              // Fallback 1: 1M context, 120B MoE, agentic
+  "openai/gpt-oss-120b:free",                 // Fallback 2: 117B, native structured output
 ];
 
-// Builds the prompt sent to Gemini with all vulnerabilities
+// Builds a LEAN prompt — only essential fields, no redundant data
 function buildAiPrompt(vulns) {
-  const items = vulns.map((v) => ({
-    id:           v.id,
-    severity:     v.severity,
-    pkg:          v.pkg,
-    title:        v.title,
-    fixedVersion: v.fixedVersion || "",
-    pkgType:      v.target && v.target.toLowerCase().includes("java") ? "jar" : "deb",
+  // Separate deb vs jar up front — jars are always not_fixable
+  const debVulns = vulns.filter(
+    (v) => !(v.target && v.target.toLowerCase().includes("java")) &&
+            !(v.pkg && v.pkg.toLowerCase().endsWith(".jar"))
+  );
+  const jarVulns = vulns.filter(
+    (v) => (v.target && v.target.toLowerCase().includes("java")) ||
+            (v.pkg && v.pkg.toLowerCase().endsWith(".jar"))
+  );
+
+  // For deb packages: only send id, pkg, fixedVersion — nothing else
+  const debItems = debVulns.map((v) => ({
+    id:  v.id,
+    pkg: v.pkg,
+    fix: v.fixedVersion || "",
   }));
 
-  return `You are a Linux/Docker security remediation expert.
-Analyze a Trivy scan of container "${CONTAINER}" running Ubuntu 24.04 with an OpenSILEX Java app.
-
-Package types:
-- "deb": Ubuntu system packages → fix with: docker exec ${CONTAINER} apt-get install -y --only-upgrade <pkg>
-- "jar": Java libraries inside opensilex.jar → CANNOT be fixed with shell commands, mark not_fixable
+  return {
+    debItems,
+    jarVulns,
+    prompt: `You are a Linux security expert. Fix Ubuntu deb package vulnerabilities in Docker container "${CONTAINER}".
 
 Rules:
-1. pkgType "jar" → always not_fixable, reason: "requires_rebuild"
-2. pkgType "deb" + empty fixedVersion → not_fixable, reason: "no_fix_available"
-3. pkgType "deb" + fixedVersion exists → fixable
-4. Group ALL fixable deb packages into ONE apt-get install command (not one per package)
-5. Always include "docker exec ${CONTAINER} apt-get update -qq" as the FIRST command
-6. Return ONLY valid JSON — no markdown, no explanation, no text before or after
+- If "fix" field is empty → not_fixable, reason: "no_fix_available"
+- If "fix" field has a version → fixable with: docker exec ${CONTAINER} apt-get install -y --only-upgrade <pkg>=<fix>
+- Group ALL fixable packages into as few apt-get install commands as possible
+- ALWAYS include apt-get update as the very first command
+- Return ONLY raw JSON — no markdown, no explanation, no text outside the JSON
 
-Required JSON format:
+JSON format (no extra fields):
 {
-  "summary": "X of Y vulnerabilities can be auto-fixed with apt-get. Z require manual action (Java JARs need source rebuild).",
-  "fixable": [
-    {
-      "id": "CVE-XXXX-XXXXX",
-      "pkg": "package-name",
-      "plan": "One sentence: what this fixes and why it is safe.",
-      "commands": ["docker exec ${CONTAINER} apt-get update -qq", "docker exec ${CONTAINER} apt-get install -y --only-upgrade package-name"],
-      "risk": "low"
-    }
-  ],
-  "not_fixable": [
-    {
-      "id": "CVE-XXXX-XXXXX",
-      "pkg": "package-name",
-      "reason": "requires_rebuild",
-      "note": "One sentence: what the human should do manually."
-    }
-  ]
+  "summary": "X of Y deb vulnerabilities auto-fixable.",
+  "fixable": [{"id":"CVE-X","pkg":"name","commands":["cmd1","cmd2"],"risk":"low"}],
+  "not_fixable": [{"id":"CVE-X","pkg":"name","reason":"no_fix_available"}]
 }
 
-Vulnerabilities to analyze:
-${JSON.stringify(items, null, 2)}`;
+Packages to analyze:
+${JSON.stringify(debItems)}`,
+  };
 }
 
-// ── callAi: tries primary model, falls back to secondary on rate limit ────────
-async function callAi(prompt) {
+// Calls OpenRouter — lean prompt, jar packages handled locally (no AI tokens wasted)
+async function callAi(vulns) {
+  const { debItems, jarVulns, prompt } = buildAiPrompt(vulns);
+
+  // Build jar not_fixable entries locally — no AI call needed
+  const jarNotFixable = jarVulns.map((v) => ({
+    id:     v.id,
+    pkg:    v.pkg,
+    reason: "requires_rebuild",
+    note:   "Java library inside opensilex.jar — requires source code rebuild to update.",
+  }));
+
   for (let i = 0; i < AI_MODELS.length; i++) {
     const model = AI_MODELS[i];
     try {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
+        method:  "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${OPENROUTER_KEY}`,
-          "HTTP-Referer": "https://github.com/Pestacial/vuln-dashboard",
-          "X-Title": "PHIS Vuln Dashboard",
+          "HTTP-Referer":  "https://github.com/Pestacial/vuln-dashboard",
+          "X-Title":       "PHIS Vuln Dashboard",
         },
         body: JSON.stringify({
-          model: model,
-          max_tokens: 8000, // Increased from 4000 to avoid truncation
+          model,
+          max_tokens: 8000,
           messages: [{ role: "user", content: prompt }],
-          // Force JSON output format (supported by Gemini & Llama via OpenRouter)
           response_format: { type: "json_object" },
         }),
       });
 
-      // Rate limited — try next model
       if (response.status === 429) {
-        console.warn(`[AI] ${model} rate limited, trying next model...`);
+        console.warn(`[AI] ${model} rate limited, trying next...`);
         continue;
       }
+      if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${await response.text()}`);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`OpenRouter ${response.status}: ${errText}`);
+      const data   = await response.json();
+      let text     = data.choices?.[0]?.message?.content || "";
+      const usage  = data.usage;
+      console.log(`[AI] ${model} — tokens: prompt=${usage?.prompt_tokens} completion=${usage?.completion_tokens} total=${usage?.total_tokens}`);
+
+      // Check if response was cut off (finish_reason = "length" means truncated)
+      const finishReason = data.choices?.[0]?.finish_reason;
+      if (finishReason === "length") {
+        console.warn(`[AI] ${model} response truncated (finish_reason=length). Trying fallback...`);
+        continue; // try next model instead of failing with a parse error
       }
 
-      const data = await response.json();
-      let text = data.choices?.[0]?.message?.content || "";
-
-      // Debug: log raw response if parsing fails later
-      // console.log("[AI] Raw response:", text.slice(0, 500) + "...");
-
-      // Strip markdown code fences (FIXED: use THREE backticks, not one)
+      // Strip markdown fences if present
       text = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      
-      // Also strip any leading/trailing non-JSON text (common with some models)
       const jsonStart = text.indexOf("{");
-      const jsonEnd = text.lastIndexOf("}");
-      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        text = text.slice(jsonStart, jsonEnd + 1);
-      }
+      const jsonEnd   = text.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1) text = text.slice(jsonStart, jsonEnd + 1);
 
       const parsed = JSON.parse(text);
       parsed._modelUsed = model;
+
+      // Merge jar not_fixable into the AI's not_fixable list
+      parsed.not_fixable = [...(parsed.not_fixable || []), ...jarNotFixable];
+      parsed.summary     = `${(parsed.fixable || []).length} of ${debItems.length} deb vulnerabilities can be auto-fixed. ${jarNotFixable.length} Java JARs require source rebuild.`;
+
       return parsed;
 
     } catch (err) {
-      // Log the raw response for debugging if this is the last model
-      if (i === AI_MODELS.length - 1) {
-        console.error("[AI] Final parse error. Raw response preview:", 
-          (await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENROUTER_KEY}` },
-            body: JSON.stringify({ model, max_tokens: 200, messages: [{ role: "user", content: "test" }] }
-          }).then(r => r.json()).then(d => d.choices?.[0]?.message?.content || "").catch(() => "N/A")));
-        throw new Error(`JSON parse failed: ${err.message}. The AI may have returned malformed output. Try again or switch models.`);
-      }
+      if (i === AI_MODELS.length - 1) throw err;
       console.warn(`[AI] ${model} failed (${err.message}), trying fallback...`);
     }
   }
-  throw new Error("All AI models failed or are rate limited. Try again in a few minutes.");
+  throw new Error("All AI models failed. Try again in a few minutes.");
 }
 
 // Calls the Kali agent's /explain-local endpoint which calls Ollama
@@ -485,7 +479,7 @@ export default function App() {
     checkAgent(); // check in background while Gemini thinks
 
     try {
-      const result = await callAi(buildAiPrompt(vulns));
+      const result = await callAi(vulns);
       setAiResult(result);
       setAiModelUsed(result._modelUsed || "");
       setSelectedFixes(new Set((result.fixable || []).map((f) => f.id)));
