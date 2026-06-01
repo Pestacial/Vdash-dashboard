@@ -1,6 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
-// ── Normalize pkg string for consistent key matching ─────────────────────
+// ── Config — update these to match your deployment ───────────────────────────
+const SCAN_SERVER_URL = "http://100.95.217.28:5000";
+// Set your SCAN_TOKEN here, or load it from a build-time env var:
+//   VITE_SCAN_TOKEN=your_token npm run build
+const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function normalizePkg(pkg) {
   return pkg.replace(/\((\d+):/, "(");
 }
@@ -8,8 +14,10 @@ function normalizePkg(pkg) {
 function parseTrivyJson(text) {
   try {
     const data = JSON.parse(text);
+    // Handle our envelope format: { scanDate, results: <trivy json> }
+    const raw = data.results !== undefined ? data.results : data;
     const vulns = [];
-    const reports = Array.isArray(data) ? data : [data];
+    const reports = Array.isArray(raw) ? raw : [raw];
     reports.forEach((report) => {
       if (!report.Results) return;
       report.Results.forEach((result) => {
@@ -27,16 +35,16 @@ function parseTrivyJson(text) {
         });
       });
     });
-    return vulns;
+    // Extract scan date from envelope if present
+    const scanDate = data.scanDate ? new Date(data.scanDate) : null;
+    return { vulns, scanDate };
   } catch (e) {
     console.warn("JSON parse failed", e);
-    return [];
+    return { vulns: [], scanDate: null };
   }
 }
 
-// ── Parser: handles simple HTML table AND scan2html (i9=[...]) formats ──────
 function parseTrivyHtml(html) {
-  // Format 1: scan2html — extract i9=[...] embedded JSON
   const scan2htmlMatch = html.match(/i9=(\[\s*\{[\s\S]*?\}\s*\])\s*[,;]/);
   if (scan2htmlMatch) {
     try {
@@ -65,7 +73,6 @@ function parseTrivyHtml(html) {
     }
   }
 
-  // Format 2: simple HTML table (Severity | ID | Package | Title)
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const rows = doc.querySelectorAll("table tr");
@@ -83,8 +90,6 @@ function parseTrivyHtml(html) {
   return vulns;
 }
 
-// ── Extract scan date from HTML comment injected by scan.py ───────────────
-// Looks for: <!-- SCAN_DATE: 2025-06-01T14:32:00 -->
 function parseScanDate(html) {
   const m = html.match(/<!--\s*SCAN_DATE:\s*([^\s>]+)\s*-->/);
   if (!m) return null;
@@ -93,7 +98,6 @@ function parseScanDate(html) {
   return d;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
 const nvdUrl = (id) =>
   id.startsWith("GHSA-")
     ? `https://github.com/advisories/${id}`
@@ -104,11 +108,11 @@ const isGhsa = (id) => id.startsWith("GHSA-");
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, NEGLIGIBLE: 4 };
 
 const SEV_STYLE = {
-  CRITICAL:  { bg: "#e8193c", glow: "#e8193c55" },
-  HIGH:      { bg: "#f97316", glow: "#f9731655" },
-  MEDIUM:    { bg: "#eab308", glow: "#eab30855" },
-  LOW:       { bg: "#6b7280", glow: "#6b728055" },
-  NEGLIGIBLE:{ bg: "#374151", glow: "#37415155" },
+  CRITICAL:   { bg: "#e8193c", glow: "#e8193c55" },
+  HIGH:       { bg: "#f97316", glow: "#f9731655" },
+  MEDIUM:     { bg: "#eab308", glow: "#eab30855" },
+  LOW:        { bg: "#6b7280", glow: "#6b728055" },
+  NEGLIGIBLE: { bg: "#374151", glow: "#37415155" },
 };
 
 const STATUS_CYCLE = ["open", "patched", "ignored"];
@@ -118,33 +122,43 @@ const STATUS_STYLE = {
   ignored: { bg: "#1c1917", color: "#a8a29e", border: "#44403c", label: "~ Ignored" },
 };
 
+// Scan UI states
+const SCAN_STATE = {
+  IDLE:     "idle",
+  STARTING: "starting",
+  RUNNING:  "running",
+  SUCCESS:  "success",
+  ERROR:    "error",
+};
+
 function formatDate(d) {
   if (!d) return null;
   return d.toLocaleString(undefined, {
-    year:   "numeric",
-    month:  "short",
-    day:    "numeric",
-    hour:   "2-digit",
-    minute: "2-digit",
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
   });
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────
+function timeSince(d) {
+  if (!d) return null;
+  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (sec < 60)  return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
 function SevBadge({ level }) {
   const s = SEV_STYLE[level] || { bg: "#374151", glow: "#37415155" };
   return (
     <span style={{
-      background: s.bg,
-      color: "#fff",
-      padding: "3px 10px",
-      borderRadius: 3,
-      fontSize: 10,
-      fontWeight: 800,
-      letterSpacing: 1.2,
+      background: s.bg, color: "#fff",
+      padding: "3px 10px", borderRadius: 3,
+      fontSize: 10, fontWeight: 800, letterSpacing: 1.2,
       fontFamily: "'DM Mono', monospace",
       boxShadow: `0 0 8px ${s.glow}`,
-      display: "inline-block",
-      whiteSpace: "nowrap",
+      display: "inline-block", whiteSpace: "nowrap",
     }}>{level}</span>
   );
 }
@@ -165,47 +179,247 @@ function StatusBtn({ status, onClick }) {
   );
 }
 
-// ── Main App ───────────────────────────────────────────────────────────────
-export default function App() {
-  const [baseVulns, setBaseVulns]         = useState([]);
-  const [uploadedVulns, setUploadedVulns] = useState(null);
-  const [uploadedName, setUploadedName]   = useState("");
-  const [activeView, setActiveView]       = useState("base");
-  const [severityFilter, setSeverityFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery]     = useState("");
-  const [patchStatus, setPatchStatus]     = useState({});
-  const [expandedRow, setExpandedRow]     = useState(null);
-  const [darkMode, setDarkMode]           = useState(false);
-  const [pageSize, setPageSize]           = useState(20);
-  const [page, setPage]                   = useState(1);
-  const [baseLoading, setBaseLoading]     = useState(true);
-  const [baseError, setBaseError]         = useState(false);
-  const [sortCol, setSortCol]             = useState(null);
-  const [sortDir, setSortDir]             = useState(null);
-  const [scanDate, setScanDate]           = useState(null);  // Date object from report
-  const fileRef = useRef();
+// Pulsing dot indicator
+function PulseDot({ color = "#4ade80" }) {
+  return (
+    <span style={{ position: "relative", display: "inline-block", width: 8, height: 8 }}>
+      <style>{`
+        @keyframes ping {
+          0%   { transform: scale(1);   opacity: 0.8; }
+          70%  { transform: scale(2.2); opacity: 0; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+      `}</style>
+      <span style={{
+        position: "absolute", inset: 0, borderRadius: "50%",
+        background: color, animation: "ping 1.2s ease-out infinite",
+      }} />
+      <span style={{
+        position: "relative", display: "block", width: 8, height: 8,
+        borderRadius: "50%", background: color,
+      }} />
+    </span>
+  );
+}
 
-  // Load base report from public/
+// Autoscan button with states
+function AutoscanButton({ scanState, onScan, T }) {
+  const isActive = scanState === SCAN_STATE.STARTING || scanState === SCAN_STATE.RUNNING;
+
+  const stateConfig = {
+    [SCAN_STATE.IDLE]:     { label: "⟳  Autoscan",   bg: "#0ea5e9", shadow: "#0ea5e955" },
+    [SCAN_STATE.STARTING]: { label: "Connecting…",    bg: "#6366f1", shadow: "#6366f155" },
+    [SCAN_STATE.RUNNING]:  { label: "Scanning…",      bg: "#8b5cf6", shadow: "#8b5cf655" },
+    [SCAN_STATE.SUCCESS]:  { label: "✓  Scan sent",   bg: "#10b981", shadow: "#10b98155" },
+    [SCAN_STATE.ERROR]:    { label: "✕  Failed",      bg: "#ef4444", shadow: "#ef444455" },
+  };
+
+  const cfg = stateConfig[scanState] || stateConfig[SCAN_STATE.IDLE];
+
+  return (
+    <button
+      onClick={onScan}
+      disabled={isActive}
+      title="Trigger a fresh Trivy scan on Kali and push results to GitHub"
+      style={{
+        background: cfg.bg, color: "#fff", border: "none",
+        padding: "6px 18px", borderRadius: 6,
+        cursor: isActive ? "not-allowed" : "pointer",
+        fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+        letterSpacing: 0.3, display: "flex", alignItems: "center", gap: 8,
+        boxShadow: `0 0 14px ${cfg.shadow}`,
+        opacity: isActive ? 0.75 : 1,
+        transition: "all 0.2s",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {isActive && <PulseDot color="#fff" />}
+      {cfg.label}
+    </button>
+  );
+}
+
+// Compact scan log drawer
+function ScanLogDrawer({ log, show, onClose, T }) {
+  if (!show) return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 0, left: 0, right: 0,
+      background: T.surface, borderTop: `2px solid #0ea5e9`,
+      zIndex: 500, maxHeight: "35vh", display: "flex", flexDirection: "column",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "8px 16px", borderBottom: `1px solid ${T.border}`,
+        background: T.surface2,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#0ea5e9", fontFamily: "'DM Mono', monospace", letterSpacing: 1.5 }}>
+          SCAN LOG
+        </span>
+        <button onClick={onClose} style={{
+          background: "transparent", border: "none", color: T.subtext,
+          cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 6px",
+        }}>✕</button>
+      </div>
+      <div style={{
+        overflowY: "auto", padding: "10px 16px",
+        fontFamily: "'DM Mono', monospace", fontSize: 11,
+        color: T.text, lineHeight: 1.6,
+        background: T.bg,
+      }}>
+        {log.length === 0
+          ? <span style={{ color: T.subtext }}>No log output yet…</span>
+          : log.map((line, i) => {
+            const col = line.includes("ERROR") || line.includes("FAIL")
+              ? "#f87171"
+              : line.includes("Done") || line.includes("successfully") || line.includes("✓")
+              ? "#4ade80"
+              : line.startsWith("[git]")
+              ? "#818cf8"
+              : T.text;
+            return (
+              <div key={i} style={{ color: col, wordBreak: "break-all" }}>{line}</div>
+            );
+          })
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ───────────────────────────────────────────────────────────────────
+export default function App() {
+  const [baseVulns, setBaseVulns]             = useState([]);
+  const [uploadedVulns, setUploadedVulns]     = useState(null);
+  const [uploadedName, setUploadedName]       = useState("");
+  const [activeView, setActiveView]           = useState("base");
+  const [severityFilter, setSeverityFilter]   = useState("ALL");
+  const [searchQuery, setSearchQuery]         = useState("");
+  const [patchStatus, setPatchStatus]         = useState({});
+  const [expandedRow, setExpandedRow]         = useState(null);
+  const [darkMode, setDarkMode]               = useState(false);
+  const [pageSize, setPageSize]               = useState(20);
+  const [page, setPage]                       = useState(1);
+  const [baseLoading, setBaseLoading]         = useState(true);
+  const [baseError, setBaseError]             = useState(false);
+  const [sortCol, setSortCol]                 = useState(null);
+  const [sortDir, setSortDir]                 = useState(null);
+  const [scanDate, setScanDate]               = useState(null);
+  // Autoscan state
+  const [scanState, setScanState]             = useState(SCAN_STATE.IDLE);
+  const [scanLog, setScanLog]                 = useState([]);
+  const [showLog, setShowLog]                 = useState(false);
+  const [scanErrorMsg, setScanErrorMsg]       = useState("");
+  const pollTimerRef                          = useRef(null);
+  const fileRef                               = useRef();
+
+  // ── Load base report ────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/base-report.html")
-      .then((r) => {
-        if (!r.ok) throw new Error("Not found");
-        return r.text();
-      })
+      .then((r) => { if (!r.ok) throw new Error("Not found"); return r.text(); })
       .then((html) => {
         setBaseVulns(parseTrivyHtml(html));
         setScanDate(parseScanDate(html));
         setBaseLoading(false);
       })
-      .catch(() => {
-        setBaseError(true);
-        setBaseLoading(false);
-      });
+      .catch(() => { setBaseError(true); setBaseLoading(false); });
   }, []);
 
+  // ── Poll scan status while running ─────────────────────────────────────────
+  const startPolling = useCallback(() => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${SCAN_SERVER_URL}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        setScanLog(data.log || []);
+
+        if (!data.running) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+
+          if (data.lastScanOk === true) {
+            setScanState(SCAN_STATE.SUCCESS);
+            // Reload the base report to pick up the new data
+            setTimeout(() => {
+              fetch("/base-report.html?bust=" + Date.now())
+                .then((r) => r.text())
+                .then((html) => {
+                  setBaseVulns(parseTrivyHtml(html));
+                  setScanDate(parseScanDate(html));
+                });
+            }, 3000); // Give Vercel ~3s to deploy
+          } else if (data.lastScanOk === false) {
+            setScanState(SCAN_STATE.ERROR);
+            setScanErrorMsg("Scan failed. Check the log for details.");
+          }
+
+          // Auto-reset button after 8s
+          setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
+        } else {
+          setScanState(SCAN_STATE.RUNNING);
+        }
+      } catch (e) {
+        // Network error while polling — keep trying
+      }
+    }, 2000);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
+  }, []);
+
+  // ── Autoscan trigger ────────────────────────────────────────────────────────
+  const handleAutoscan = useCallback(async () => {
+    if (scanState === SCAN_STATE.STARTING || scanState === SCAN_STATE.RUNNING) return;
+
+    setScanState(SCAN_STATE.STARTING);
+    setScanLog([]);
+    setScanErrorMsg("");
+    setShowLog(true);
+
+    try {
+      const res = await fetch(`${SCAN_SERVER_URL}/scan`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${SCAN_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ container: "sandbox-opensilex-docker-opensilexapp" }),
+      });
+
+      if (res.status === 409) {
+        setScanLog(["[server] A scan is already running on Kali."]);
+        setScanState(SCAN_STATE.RUNNING);
+        startPolling();
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setScanState(SCAN_STATE.ERROR);
+        setScanErrorMsg(err.error || `Server returned HTTP ${res.status}`);
+        setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
+        return;
+      }
+
+      setScanState(SCAN_STATE.RUNNING);
+      startPolling();
+
+    } catch (e) {
+      setScanState(SCAN_STATE.ERROR);
+      setScanErrorMsg(`Could not reach scan server at ${SCAN_SERVER_URL}. Is it running on Kali?`);
+      setScanLog([`[client] ${e.message}`]);
+      setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
+    }
+  }, [scanState, startPolling]);
+
+  // ── Data derivations ────────────────────────────────────────────────────────
   const vulns = activeView === "base" ? baseVulns : (uploadedVulns || []);
 
-  // Reset page on filter/search/view change
   useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
 
   const counts = useMemo(() => {
@@ -240,13 +454,13 @@ export default function App() {
     }
     if (sortCol && sortDir) {
       list.sort((a, b) => {
-        let va = a[sortCol] ?? "";
-        let vb = b[sortCol] ?? "";
         if (sortCol === "severity") {
-          va = SEVERITY_ORDER[a.severity] ?? 9;
-          vb = SEVERITY_ORDER[b.severity] ?? 9;
+          const va = SEVERITY_ORDER[a.severity] ?? 9;
+          const vb = SEVERITY_ORDER[b.severity] ?? 9;
           return sortDir === "asc" ? va - vb : vb - va;
         }
+        const va = a[sortCol] ?? "";
+        const vb = b[sortCol] ?? "";
         return sortDir === "asc"
           ? va.toString().localeCompare(vb.toString())
           : vb.toString().localeCompare(va.toString());
@@ -267,8 +481,16 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target.result;
-      const isJson = file.name.toLowerCase().endsWith(".json");
-      const parsed = isJson ? parseTrivyJson(content) : parseTrivyHtml(content);
+      const isJson  = file.name.toLowerCase().endsWith(".json");
+      let parsed, uploadScanDate = null;
+
+      if (isJson) {
+        const result = parseTrivyJson(content);
+        parsed = result.vulns;
+        uploadScanDate = result.scanDate;
+      } else {
+        parsed = parseTrivyHtml(content);
+      }
 
       const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${normalizePkg(v.pkg)}`));
       setPatchStatus((prev) => {
@@ -290,42 +512,32 @@ export default function App() {
   };
 
   const handleSort = (col) => {
-    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
-    else if (sortDir === "asc") setSortDir("desc");
-    else if (sortDir === "desc") { setSortCol(null); setSortDir(null); }
+    if (sortCol !== col)     { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc")  setSortDir("desc");
+    else                     { setSortCol(null); setSortDir(null); }
   };
 
   const cycleStatus = (e, key) => {
     e.stopPropagation();
     setPatchStatus((prev) => {
-      const cur = prev[key] || "open";
+      const cur  = prev[key] || "open";
       const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
       return { ...prev, [key]: next };
     });
   };
 
-  // ── Theme ──────────────────────────────────────────────────────────────
+  // ── Theme ───────────────────────────────────────────────────────────────────
   const T = darkMode ? {
-    bg:       "#080f1a",
-    surface:  "#0d1829",
-    surface2: "#111f33",
-    border:   "#1a2d48",
-    text:     "#c8daf0",
-    subtext:  "#4a6080",
-    hover:    "#162035",
-    accent:   "#3b82f6",
+    bg: "#080f1a", surface: "#0d1829", surface2: "#111f33",
+    border: "#1a2d48", text: "#c8daf0", subtext: "#4a6080",
+    hover: "#162035", accent: "#3b82f6",
   } : {
-    bg:       "#f1f5fb",
-    surface:  "#ffffff",
-    surface2: "#f7f9fd",
-    border:   "#dde5f0",
-    text:     "#0f1f38",
-    subtext:  "#7a90b0",
-    hover:    "#eef3fc",
-    accent:   "#2563eb",
+    bg: "#f1f5fb", surface: "#ffffff", surface2: "#f7f9fd",
+    border: "#dde5f0", text: "#0f1f38", subtext: "#7a90b0",
+    hover: "#eef3fc", accent: "#2563eb",
   };
 
-  const isBase = activeView === "base";
+  const isBase  = activeView === "base";
   const gridCols = isBase
     ? "110px minmax(0, 1fr) 180px 100px 100px"
     : "110px minmax(0, 1fr) 180px 100px";
@@ -343,19 +555,21 @@ export default function App() {
         boxShadow: darkMode ? "0 2px 20px #00000060" : "0 2px 10px #0000001a",
       }}>
         {/* Left */}
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, color: T.accent, letterSpacing: 2 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "nowrap", overflow: "hidden" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, color: T.accent, letterSpacing: 2, flexShrink: 0 }}>
             ▸ VULNDASH
           </span>
-          <div style={{ width: 1, height: 24, background: T.border }} />
+          <div style={{ width: 1, height: 24, background: T.border, flexShrink: 0 }} />
+
           <button onClick={() => { setActiveView("base"); setSeverityFilter("ALL"); setSearchQuery(""); }}
             style={{
               background: isBase ? `${T.accent}20` : "transparent",
               color: isBase ? T.accent : T.subtext,
               border: `1px solid ${isBase ? T.accent + "55" : "transparent"}`,
               padding: "4px 14px", borderRadius: 5, cursor: "pointer",
-              fontSize: 12, fontWeight: 600, fontFamily: "inherit", transition: "all 0.2s",
+              fontSize: 12, fontWeight: 600, fontFamily: "inherit", transition: "all 0.2s", flexShrink: 0,
             }}>Base Report</button>
+
           {uploadedVulns && (
             <button onClick={() => { setActiveView("uploaded"); setSeverityFilter("ALL"); setSearchQuery(""); }}
               style={{
@@ -363,56 +577,88 @@ export default function App() {
                 color: !isBase ? "#10b981" : T.subtext,
                 border: `1px solid ${!isBase ? "#10b98155" : "transparent"}`,
                 padding: "4px 14px", borderRadius: 5, cursor: "pointer",
-                fontSize: 12, fontWeight: 600, fontFamily: "inherit", transition: "all 0.2s",
+                fontSize: 12, fontWeight: 600, fontFamily: "inherit", transition: "all 0.2s", flexShrink: 0,
               }}>↑ {uploadedName}</button>
           )}
-          {/* ── Last scanned pill ── */}
+
+          {/* Last scan timestamp pill */}
           {scanDate && isBase && (
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
               background: T.surface2, border: `1px solid ${T.border}`,
-              padding: "3px 12px", borderRadius: 20,
+              padding: "3px 12px", borderRadius: 20, flexShrink: 0,
             }}>
-              <span style={{ fontSize: 10, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
-                🕐 Last scan:
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: T.text, fontFamily: "'DM Mono', monospace" }}>
+              <span style={{ fontSize: 10, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>🕐</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.text, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>
                 {formatDate(scanDate)}
               </span>
+              <span style={{ fontSize: 10, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
+                ({timeSince(scanDate)})
+              </span>
             </div>
+          )}
+
+          {/* Scan error inline */}
+          {scanState === SCAN_STATE.ERROR && scanErrorMsg && (
+            <span style={{
+              fontSize: 11, color: "#f87171", fontFamily: "'DM Mono', monospace",
+              background: "#3f0f0f", border: "1px solid #7f1d1d",
+              padding: "3px 10px", borderRadius: 4, flexShrink: 0, maxWidth: 280,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }} title={scanErrorMsg}>
+              ✕ {scanErrorMsg}
+            </span>
           )}
         </div>
 
         {/* Right */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search CVE, package, title…"
             style={{
               background: T.surface2, border: `1px solid ${T.border}`,
               color: T.text, padding: "5px 14px", borderRadius: 6,
-              fontSize: 12, fontFamily: "inherit", outline: "none", width: 240,
+              fontSize: 12, fontFamily: "inherit", outline: "none", width: 220,
             }} />
+
           <button onClick={() => setDarkMode((d) => !d)} style={{
             background: T.surface2, border: `1px solid ${T.border}`,
             color: T.text, padding: "5px 10px", borderRadius: 6,
             cursor: "pointer", fontSize: 14, lineHeight: 1,
           }}>{darkMode ? "☀" : "☾"}</button>
+
           <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{
             background: T.surface2, border: `1px solid ${T.border}`,
             color: T.text, padding: "5px 10px", borderRadius: 6,
             fontSize: 12, fontFamily: "inherit", cursor: "pointer", outline: "none",
           }}>
-            <option value={20}>20 entries</option>
-            <option value={50}>50 entries</option>
-            <option value={100}>100 entries</option>
+            <option value={20}>20 rows</option>
+            <option value={50}>50 rows</option>
+            <option value={100}>100 rows</option>
           </select>
+
           <input ref={fileRef} type="file" accept=".html,.json" style={{ display: "none" }} onChange={handleUpload} />
           <button onClick={() => fileRef.current.click()} style={{
-            background: T.accent, color: "#fff", border: "none",
-            padding: "6px 18px", borderRadius: 6, cursor: "pointer",
-            fontSize: 12, fontWeight: 700, fontFamily: "inherit", letterSpacing: 0.3,
-            boxShadow: `0 0 12px ${T.accent}55`,
-          }}>↑ Upload Report</button>
+            background: T.surface2, color: T.text,
+            border: `1px solid ${T.border}`,
+            padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+            fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+          }}>↑ Upload</button>
+
+          {/* Autoscan button */}
+          <AutoscanButton scanState={scanState} onScan={handleAutoscan} T={T} />
+
+          {/* Log toggle — only show when there's a log */}
+          {(scanLog.length > 0 || scanState !== SCAN_STATE.IDLE) && (
+            <button onClick={() => setShowLog((s) => !s)} style={{
+              background: showLog ? "#0ea5e920" : T.surface2,
+              color: showLog ? "#0ea5e9" : T.subtext,
+              border: `1px solid ${showLog ? "#0ea5e955" : T.border}`,
+              padding: "5px 10px", borderRadius: 6,
+              cursor: "pointer", fontSize: 11,
+              fontFamily: "'DM Mono', monospace", fontWeight: 600,
+            }}>LOG</button>
+          )}
         </div>
       </div>
 
@@ -429,16 +675,19 @@ export default function App() {
             background: "#1a0a0a", border: "1px solid #7f1d1d",
             borderRadius: 8, padding: 20, marginBottom: 20, color: "#fca5a5", fontSize: 13,
           }}>
-            ⚠ Could not load <code>base-report.html</code>. Make sure you placed it in the <code>public/</code> folder of your project.
+            ⚠ Could not load <code>base-report.html</code>. Make sure it exists in the <code>public/</code> folder.
           </div>
         )}
 
-        {/* ── Severity pills ── */}
+        {/* Severity pills */}
         {!baseLoading && (
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",        label: `All (${vulns.length})` },
-              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => { const k = `${v.id}|${normalizePkg(v.pkg)}`; return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched"; }).length})` }] : []),
+              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => {
+                const k = `${v.id}|${normalizePkg(v.pkg)}`;
+                return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched";
+              }).length})` }] : []),
               { key: "CRITICAL",   label: `Critical (${counts.CRITICAL})` },
               { key: "HIGH",       label: `High (${counts.HIGH})` },
               { key: "MEDIUM",     label: `Medium (${counts.MEDIUM})` },
@@ -446,7 +695,7 @@ export default function App() {
               { key: "NEGLIGIBLE", label: `Negligible (${counts.NEGLIGIBLE})` },
             ].map(({ key, label }) => {
               const active = severityFilter === key;
-              const sev = SEV_STYLE[key];
+              const sev    = SEV_STYLE[key];
               const isNewBtn = key === "NEW";
               return (
                 <button key={key} onClick={() => setSeverityFilter(key)} style={{
@@ -463,7 +712,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Table ── */}
+        {/* Table */}
         {!baseLoading && (
           <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", width: "100%" }}>
             {/* Header */}
@@ -479,8 +728,8 @@ export default function App() {
                 { label: "Status",         col: null },
                 ...(isBase ? [{ label: "Remediation", col: null }] : []),
               ].map(({ label, col }) => {
-                const isActive = sortCol === col && col !== null;
-                const upActive = isActive && sortDir === "asc";
+                const isActive  = sortCol === col && col !== null;
+                const upActive   = isActive && sortDir === "asc";
                 const downActive = isActive && sortDir === "desc";
                 return (
                   <div key={label}
@@ -493,7 +742,8 @@ export default function App() {
                       </span>
                     )}
                     <span style={{
-                      fontSize: 10, fontWeight: 700, color: isActive ? T.accent : T.subtext,
+                      fontSize: 10, fontWeight: 700,
+                      color: isActive ? T.accent : T.subtext,
                       textTransform: "uppercase", letterSpacing: 1.5,
                       fontFamily: "'DM Mono', monospace",
                     }}>{label}</span>
@@ -502,18 +752,18 @@ export default function App() {
               })}
             </div>
 
-            {/* Data rows */}
+            {/* Rows */}
             {paginated.length === 0 ? (
               <div style={{ padding: 48, textAlign: "center", color: T.subtext, fontSize: 13 }}>
                 No vulnerabilities match the current filter.
               </div>
             ) : paginated.map((v, i) => {
-              const key = `${v.id}|${normalizePkg(v.pkg)}`;
-              const status = patchStatus[key] || "open";
-              const isExp = expandedRow === key;
+              const key     = `${v.id}|${normalizePkg(v.pkg)}`;
+              const status  = patchStatus[key] || "open";
+              const isExp   = expandedRow === key;
               const isPatched = status === "patched";
-              const isNew = !isBase && !baseIdSet.has(key) && status !== "patched";
-              const rowBg = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
+              const isNew   = !isBase && !baseIdSet.has(key) && status !== "patched";
+              const rowBg   = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
 
               return (
                 <div key={`${key}-${i}`} style={{ borderBottom: `1px solid ${T.border}` }}>
@@ -545,9 +795,7 @@ export default function App() {
                           }}>NEW</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>
-                        {v.pkg}
-                      </div>
+                      <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace" }}>{v.pkg}</div>
                     </div>
 
                     <div>
@@ -558,9 +806,7 @@ export default function App() {
                       </a>
                     </div>
 
-                    <div>
-                      <StatusBtn status={status} onClick={(e) => cycleStatus(e, key)} />
-                    </div>
+                    <div><StatusBtn status={status} onClick={(e) => cycleStatus(e, key)} /></div>
 
                     {isBase && (
                       <div>
@@ -614,7 +860,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Pagination ── */}
+        {/* Pagination */}
         {!baseLoading && filtered.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 16, gap: 6 }}>
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{
@@ -636,7 +882,7 @@ export default function App() {
               }
               return pages.map((p, i) =>
                 p === "…" ? (
-                  <span key={`ellipsis-${i}`} style={{ color: T.subtext, fontSize: 13, padding: "0 4px" }}>…</span>
+                  <span key={`e-${i}`} style={{ color: T.subtext, fontSize: 13, padding: "0 4px" }}>…</span>
                 ) : (
                   <button key={p} onClick={() => setPage(p)} style={{
                     background: p === page ? T.accent : T.surface2,
@@ -666,6 +912,9 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Scan log drawer */}
+      <ScanLogDrawer log={scanLog} show={showLog} onClose={() => setShowLog(false)} T={T} />
     </div>
   );
 }
