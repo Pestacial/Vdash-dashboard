@@ -347,9 +347,11 @@ if (!data.running) {
       fetch("/base-report.html?bust=" + Date.now())
         .then((r) => r.text())
         .then((html) => {
+          // Parse new scan result
           const parsed = parseTrivyHtml(html);
           const newScanDate = parseScanDate(html);
 
+          // Mark "patched": items in baseVulns but missing from new scan
           const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
           setPatchStatus(prev => {
             const updated = { ...prev };
@@ -362,6 +364,7 @@ if (!data.running) {
             return updated;
           });
 
+          // Show new scan as active view (DO NOT overwrite baseVulns)
           setUploadedVulns(parsed);
           setUploadedName("Autoscan Report");
           setActiveView("uploaded");
@@ -370,7 +373,7 @@ if (!data.running) {
           setSearchQuery("");
         });
     }, 3000);
-  } else if (data.lastScanOk === false) {  //  Now properly paired with the if above
+  } else if (data.lastScanOk === false) {
     setScanState(SCAN_STATE.ERROR);
     setScanErrorMsg("Scan failed. Check the log for details.");
   }
