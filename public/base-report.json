@@ -1,9 +1,9 @@
 {
-  "scanDate": "2026-06-01T12:59:59.188512+00:00",
+  "scanDate": "2026-06-01T13:11:46.614548+00:00",
   "container": "sandbox-opensilex-docker-opensilexapp",
   "results": {
     "SchemaVersion": 2,
-    "CreatedAt": "2026-06-01T14:59:59.164619564+02:00",
+    "CreatedAt": "2026-06-01T15:11:46.588686367+02:00",
     "ArtifactName": "sandbox-stack-opensilex",
     "ArtifactType": "container_image",
     "Metadata": {
