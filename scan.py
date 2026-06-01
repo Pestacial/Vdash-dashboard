@@ -35,7 +35,7 @@ Requirements:
 
 SSH_MODE:
     If Trivy is not installed locally but is on Kali, set:
-        SCAN_ON_KALI = True
+        SCAN_ON_KALI = False
     The script will SSH into Kali, run Trivy there, and pull back the JSON.
     Edit SSH_HOST / SSH_USER / SSH_KEY below to match your setup.
 """
@@ -52,11 +52,12 @@ from pathlib import Path
 # ── Configuration — edit these to match your setup ────────────────────────────
 
 # Run Trivy on Kali via SSH instead of locally?
-SCAN_ON_KALI = True
+SCAN_ON_KALI = False
 
 SSH_HOST = "100.95.217.28"          # Kali Tailscale IP
 SSH_USER = "pasta"
-SSH_KEY  = r"C:\Users\Pasta\Desktop\PHIS-docker-compose-official\id_ed25519"
+SSH_KEY  = "/home/pasta/.ssh/id_ed25519"
+#SSH_KEY  = r"C:\Users\Pasta\Desktop\PHIS-docker-compose-official\id_ed25519"
 # On Linux/Mac use a path like: "/home/user/.ssh/id_ed25519"
 
 # Default container to scan
@@ -110,12 +111,29 @@ def row_html(severity: str, vuln_id: str, pkg: str, title: str) -> str:
         f"</tr>"
     )
 
-
+# -- container name helper --
+def get_image_from_container(container: str) -> str:
+    """Resolve a running container name to its source image name/tag."""
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", container, "--format={{.Config.Image}}"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    # Fallback: assume user passed image name directly
+    return container
 # ── Trivy runner ───────────────────────────────────────────────────────────────
 
 def run_trivy_local(container: str, severities: list[str]) -> dict:
     """Run trivy via docker exec on the local machine."""
     sev_filter = ",".join(severities)
+
+    # Resolve container name to actual image name for `trivy image`
+    image_name = get_image_from_container(container)
+
     cmd = [
         "trivy", "image",
         "--format", "json",
@@ -144,7 +162,7 @@ def run_trivy_local(container: str, severities: list[str]) -> dict:
             "--format", "json",
             "--severity", sev_filter,
             "--quiet", "--no-progress",
-            container,
+            image_name,
         ]
         result = subprocess.run(img_cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -330,9 +348,21 @@ def main():
     output_path.write_text(html, encoding="utf-8")
     print(f"[scan] Report written to {output_path}")
 
+    # ── ALSO WRITE JSON REPORT ─────────────────────────────────────
+    json_output = {
+        "scanDate": scan_dt.isoformat(),
+        "container": args.container,
+        "results": raw  # original Trivy JSON
+    }
+    json_path = output_path.with_suffix(".json")
+    json_path.write_text(json.dumps(json_output, indent=2), encoding="utf-8")
+    print(f"[scan] JSON report written to {json_path}")
+    # ──────────────────────────────────────────────────────────────
+
     # Git push
     if not args.no_git:
         git_push(output_path)
+        git_push(json_path)
         print("[scan] Done. Vercel will deploy the updated report automatically.")
     else:
         print("[scan] Done. Skipped git push (--no-git).")
