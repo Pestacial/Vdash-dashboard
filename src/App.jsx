@@ -8,7 +8,7 @@ const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function normalizePkg(pkg) {
-  return pkg.replace(/\((\d+):/, "(");
+  return pkg.trim(); // Trim whitespace for consistent key comparison between JSON/HTML parsers
 }
 
 function parseTrivyJson(text) {
@@ -27,7 +27,7 @@ function parseTrivyJson(text) {
           vulns.push({
             severity: (v.Severity || "UNKNOWN").toUpperCase(),
             id: v.VulnerabilityID,
-            pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+            pkg: v.PkgName + (v.InstalledVersion ? ` (${v.InstalledVersion})` : ""),
             title: v.Title || v.VulnerabilityID,
             target: result.Target || "",
             fixedVersion: v.FixedVersion || "",
@@ -59,7 +59,7 @@ function parseTrivyHtml(html) {
             vulns.push({
               severity: (v.Severity || "UNKNOWN").toUpperCase(),
               id: v.VulnerabilityID,
-              pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+              pkg: v.PkgName + (v.InstalledVersion ? ` (${v.InstalledVersion})` : ""),
               title: v.Title || v.VulnerabilityID,
               target: result.Target || "",
               fixedVersion: v.FixedVersion || "",
@@ -337,53 +337,49 @@ export default function App() {
 
         setScanLog(data.log || []);
 
-        if (!data.running) {
-          clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
+if (!data.running) {
+  clearInterval(pollTimerRef.current);
+  pollTimerRef.current = null;
 
-if (data.lastScanOk === true) {
-  setScanState(SCAN_STATE.SUCCESS);
-  setTimeout(() => {
-    fetch("/base-report.html?bust=" + Date.now())
-      .then((r) => r.text())
-      .then((html) => {
-        const parsed = parseTrivyHtml(html);
-        const newScanDate = parseScanDate(html);
+  if (data.lastScanOk === true) {
+    setScanState(SCAN_STATE.SUCCESS);
+    setTimeout(() => {
+      fetch("/base-report.html?bust=" + Date.now())
+        .then((r) => r.text())
+        .then((html) => {
+          const parsed = parseTrivyHtml(html);
+          const newScanDate = parseScanDate(html);
 
-        //  Calculate "patched" status: compare new scan against original reference
-        const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
-        setPatchStatus(prev => {
-          const updated = { ...prev };
-          baseVulns.forEach(v => {
-            const key = `${v.id}|${normalizePkg(v.pkg)}`;
-            // If it was in reference but missing from new scan → patched
-            if (!newKeys.has(key) && !prev[key]) {
-              updated[key] = "patched";
-            }
+          const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
+          setPatchStatus(prev => {
+            const updated = { ...prev };
+            baseVulns.forEach(v => {
+              const key = `${v.id}|${normalizePkg(v.pkg)}`;
+              if (!newKeys.has(key) && !prev[key]) {
+                updated[key] = "patched";
+              }
+            });
+            return updated;
           });
-          return updated;
+
+          setUploadedVulns(parsed);
+          setUploadedName("Autoscan Report");
+          setActiveView("uploaded");
+          setScanDate(newScanDate);
+          setSeverityFilter("ALL");
+          setSearchQuery("");
         });
+    }, 3000);
+  } else if (data.lastScanOk === false) {  //  Now properly paired with the if above
+    setScanState(SCAN_STATE.ERROR);
+    setScanErrorMsg("Scan failed. Check the log for details.");
+  }
 
-        //  Show new scan as the active view (don't overwrite reference)
-        setUploadedVulns(parsed);
-        setUploadedName("Autoscan Report");
-        setActiveView("uploaded");
-        setScanDate(newScanDate);
-        setSeverityFilter("ALL");
-        setSearchQuery("");
-      });
-  }, 3000); // Give Vercel ~3s to deploy
+  // Auto-reset button after 8s
+  setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
+} else {
+  setScanState(SCAN_STATE.RUNNING);
 }
-          } else if (data.lastScanOk === false) {
-            setScanState(SCAN_STATE.ERROR);
-            setScanErrorMsg("Scan failed. Check the log for details.");
-          }
-
-          // Auto-reset button after 8s
-          setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
-        } else {
-          setScanState(SCAN_STATE.RUNNING);
-        }
       } catch (e) {
         // Network error while polling — keep trying
       }
@@ -433,7 +429,7 @@ if (data.lastScanOk === true) {
 
     } catch (e) {
       setScanState(SCAN_STATE.ERROR);
-      setScanErrorMsg(`Could not reach scan server at ${SCAN_SERVER_URL}. Is it running on Kali?`);
+      setScanErrorMsg(`Could not reach scan server at ${SCAN_SERVER_URL}. Is it running on linux?`);
       setScanLog([`[client] ${e.message}`]);
       setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
     }
