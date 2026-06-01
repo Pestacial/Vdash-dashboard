@@ -341,17 +341,38 @@ export default function App() {
           clearInterval(pollTimerRef.current);
           pollTimerRef.current = null;
 
-          if (data.lastScanOk === true) {
-            setScanState(SCAN_STATE.SUCCESS);
-            // Reload the base report to pick up the new data
-            setTimeout(() => {
-              fetch("/base-report.html?bust=" + Date.now())
-                .then((r) => r.text())
-                .then((html) => {
-                  setBaseVulns(parseTrivyHtml(html));
-                  setScanDate(parseScanDate(html));
+      if (data.lastScanOk === true) {
+        setScanState(SCAN_STATE.SUCCESS);
+        setTimeout(() => {
+          fetch("/base-report.html?bust=" + Date.now())
+            .then((r) => r.text())
+            .then((html) => {
+              const parsed = parseTrivyHtml(html);
+              const newScanDate = parseScanDate(html);
+
+              // 🔹 Calculate "patched" status against the original reference
+              const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
+              setPatchStatus(prev => {
+                const updated = { ...prev };
+                baseVulns.forEach(v => {
+                  const key = `${v.id}|${normalizePkg(v.pkg)}`;
+                  // If it was in the reference but is missing from the new scan → patched
+                  if (!newKeys.has(key) && !prev[key]) {
+                    updated[key] = "patched";
+                  }
                 });
-            }, 3000); // Give Vercel ~3s to deploy
+                return updated;
+              });
+
+              // 🔹 Show the new scan as the active/current view
+              setUploadedVulns(parsed);
+              setUploadedName("Autoscan Report");
+              setActiveView("uploaded");
+              setScanDate(newScanDate);
+              setSeverityFilter("ALL");
+              setSearchQuery("");
+            });
+        }, 3000); // Give Vercel ~3s to deploy
           } else if (data.lastScanOk === false) {
             setScanState(SCAN_STATE.ERROR);
             setScanErrorMsg("Scan failed. Check the log for details.");
