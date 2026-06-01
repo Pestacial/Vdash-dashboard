@@ -62,10 +62,7 @@ LISTEN_PORT = 5000
 
 # Your Vercel dashboard URL (for CORS).
 # Update this if your Vercel project URL changes.
-<<<<<<< HEAD
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN","https://vuln-dashboard.vercel.app")
-=======
->>>>>>> b1273d156d9aedf63e1c6a249d8634e06adf1c17
 
 # How long (seconds) to keep scan log output before clearing it.
 LOG_TTL = 300
@@ -84,7 +81,6 @@ _last_scan_ok = None      # True/False
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _add_cors(response):
-<<<<<<< HEAD
     origin = request.headers.get("Origin", "")
     allowed = [
         "https://vuln-dashboard.vercel.app",
@@ -93,8 +89,6 @@ def _add_cors(response):
     ]
     if origin in allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
-=======
->>>>>>> b1273d156d9aedf63e1c6a249d8634e06adf1c17
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     return response
@@ -239,16 +233,13 @@ if __name__ == "__main__":
     print(f"[server] CORS origin: {ALLOWED_ORIGIN}")
     print(f"[server] Token set  : {'YES (custom)' if SCAN_TOKEN != 'CHANGE_ME_USE_A_REAL_SECRET' else 'NO — SET IT!'}\n")
 
-<<<<<<< HEAD
     # HTTPS for Tailscale-only access
     cert_file = Path(__file__).parent / "100.95.217.28.pem"
     key_file  = Path(__file__).parent / "100.95.217.28-key.pem"
     app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True,
             ssl_context=(str(cert_file), str(key_file)))
-=======
-    app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True)
->>>>>>> b1273d156d9aedf63e1c6a249d8634e06adf1c17
 
+    app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SYSTEMD SERVICE SETUP
