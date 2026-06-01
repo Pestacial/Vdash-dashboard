@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 // ── Config — update these to match your deployment ───────────────────────────
-const SCAN_SERVER_URL = "http://100.95.217.28:5000";
+const SCAN_SERVER_URL = "https://100.95.217.28:5000";
 // Set your SCAN_TOKEN here, or load it from a build-time env var:
 //   VITE_SCAN_TOKEN=your_token npm run build
 const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
