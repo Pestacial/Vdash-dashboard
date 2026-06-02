@@ -744,8 +744,8 @@ export default function App() {
               background: T.surface2, borderBottom: `1px solid ${T.border}`,
             }}>
               {[
-                { label: "AI Fix", col: null },
                 { label: "Severity", col: "severity" },
+                { label: "AI Fix", col: null },
                 { label: "Title / Package", col: "title" },
                 { label: "CVE / ID", col: "id" },
                 { label: "Status", col: null },
