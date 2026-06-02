@@ -543,8 +543,8 @@ export default function App() {
 
   const isBase = activeView === "base";
   const gridCols = isBase
-    ? "110px minmax(0, 1fr) 180px 100px 100px"
-    : "110px minmax(0, 1fr) 180px 100px";
+    ? "90px 60px minmax(0, 1fr) 180px 100px 100px"
+    : "90px 60px minmax(0, 1fr) 180px 100px";
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
@@ -744,8 +744,8 @@ export default function App() {
               background: T.surface2, borderBottom: `1px solid ${T.border}`,
             }}>
               {[
-                { label: "Severity", col: "severity" },
                 { label: "AI Fix", col: null },
+                { label: "Severity", col: "severity" },
                 { label: "Title / Package", col: "title" },
                 { label: "CVE / ID", col: "id" },
                 { label: "Status", col: null },
@@ -813,7 +813,7 @@ export default function App() {
                               title="Click to review AI fix"
                               style={{
                                 background: "#8b5cf620", border: "1px solid #8b5cf6", color: "#8b5cf6",
-                                padding: "2px 8px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700
+                                padding: "2px 6px", borderRadius: 4, cursor: "pointer", fontSize: 14, fontWeight: 700
                               }}
                             >🤖 Fix</button>
                           );
