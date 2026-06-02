@@ -236,7 +236,7 @@ def parse_trivy_json(data: dict | list) -> list[dict]:
 
 def build_html(vulns: list[dict], container: str, scan_dt: datetime) -> str:
     """Render the HTML report in base-report.html format."""
-    iso = scan_dt.strftime("%Y-%m-%dT%H:%M:%S")
+    iso = scan_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     rows = "".join(
         row_html(v["severity"], v["id"], v["pkg"], v["title"])
