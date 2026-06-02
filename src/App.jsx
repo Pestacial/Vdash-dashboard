@@ -8,7 +8,7 @@ const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function normalizePkg(pkg) {
-  return pkg.replace(/\((\d+):/, "(");
+  return pkg.trim();
 }
 
 function parseTrivyJson(text) {
@@ -27,7 +27,7 @@ function parseTrivyJson(text) {
           vulns.push({
             severity: (v.Severity || "UNKNOWN").toUpperCase(),
             id: v.VulnerabilityID,
-            pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+            pkg: v.PkgName + (v.InstalledVersion ? ` (${v.InstalledVersion})` : ""),
             title: v.Title || v.VulnerabilityID,
             target: result.Target || "",
             fixedVersion: v.FixedVersion || "",
@@ -59,7 +59,7 @@ function parseTrivyHtml(html) {
             vulns.push({
               severity: (v.Severity || "UNKNOWN").toUpperCase(),
               id: v.VulnerabilityID,
-              pkg: v.PkgName + (v.InstalledVersion ? " (" + v.InstalledVersion + ")" : ""),
+              pkg: v.PkgName + (v.InstalledVersion ? ` (${v.InstalledVersion})` : ""),
               title: v.Title || v.VulnerabilityID,
               target: result.Target || "",
               fixedVersion: v.FixedVersion || "",
@@ -348,8 +348,29 @@ export default function App() {
               fetch("/base-report.html?bust=" + Date.now())
                 .then((r) => r.text())
                 .then((html) => {
-                  setBaseVulns(parseTrivyHtml(html));
-                  setScanDate(parseScanDate(html));
+                  const parsed = parseTrivyHtml(html);
+                  const newScanDate = parseScanDate(html);
+                  // 1. Calculate "patched" status: compare new scan against the ORIGINAL reference (baseVulns)
+                  const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
+                  setPatchStatus(prev => {
+                    const updated = { ...prev };
+                    baseVulns.forEach(v => {
+                      const key = `${v.id}|${normalizePkg(v.pkg)}`;
+                      // If it was in the reference but is missing from the new scan → patched
+                      if (!newKeys.has(key) && !prev[key]) {
+                        updated[key] = "patched";
+                      }
+                    });
+                    return updated;
+                  });
+
+                  // 2. Show the new scan as the active view WITHOUT overwriting the baseVulns reference
+                  setUploadedVulns(parsed);
+                  setUploadedName("Autoscan Report");
+                  setActiveView("uploaded");
+                  setScanDate(newScanDate);
+                  setSeverityFilter("ALL");
+                  setSearchQuery("");
                 });
             }, 3000); // Give Vercel ~3s to deploy
           } else if (data.lastScanOk === false) {
