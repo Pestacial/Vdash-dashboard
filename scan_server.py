@@ -82,14 +82,11 @@ _last_scan_ok = None      # True/False
 
 def _add_cors(response):
     origin = request.headers.get("Origin", "")
-    allowed = [
-        "https://vuln-dashboard.vercel.app",                           # production
-        "https://vulndashboard-nu.vercel.app",                          # preview 1
-        "https://vuln-dashboard-4v86f59lu-pestacials-projects.vercel.app",  # ← your preview
-        "http://localhost:5173",                                        # local dev
-    ]
-    if origin in allowed:
+    
+    # Allow localhost, OR any Vercel deployment for your project
+    if origin == "http://localhost:5173" or origin.endswith("pestacials-projects.vercel.app"):
         response.headers["Access-Control-Allow-Origin"] = origin
+        
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     return response
