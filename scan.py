@@ -348,12 +348,16 @@ def main():
 
     # Git push both files
     if not args.no_git:
+        # 1. PULL FIRST: Sync with GitHub (Lenovo's commits) to prevent push rejections
+        print("[git] git pull --rebase origin main")
+        subprocess.run(["git", "pull", "--rebase", "origin", "main"], capture_output=True, text=True)
+        
+        # 2. PUSH: Now it's safe to push the new reports
         git_push(output_path)      # HTML
         git_push(json_path)        # JSON
         print("[scan] Done. Vercel will deploy the updated report automatically.")
     else:
         print("[scan] Done. Skipped git push (--no-git).")
-
 
 if __name__ == "__main__":
     main()
