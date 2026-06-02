@@ -350,27 +350,25 @@ export default function App() {
                 .then((html) => {
                   const parsed = parseTrivyHtml(html);
                   const newScanDate = parseScanDate(html);
-                  // 1. Calculate "patched" status: compare new scan against the ORIGINAL reference (baseVulns)
-                  const newKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
-                  setPatchStatus(prev => {
-                    const updated = { ...prev };
-                    baseVulns.forEach(v => {
-                      const key = `${v.id}|${normalizePkg(v.pkg)}`;
-                      // If it was in the reference but is missing from the new scan → patched
-                      if (!newKeys.has(key) && !prev[key]) {
-                        updated[key] = "patched";
-                      }
-                    });
-                    return updated;
-                  });
 
-                  // 2. Show the new scan as the active view WITHOUT overwriting the baseVulns reference
-                  setUploadedVulns(parsed);
-                  setUploadedName("Autoscan Report");
-                  setActiveView("uploaded");
+                  // If an uploaded (old) report exists, re-evaluate "patched" against the NEW base report
+                  if (uploadedVulns) {
+                    const baseKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
+                    setPatchStatus((prev) => {
+                      const updated = { ...prev };
+                      uploadedVulns.forEach((v) => {
+                        const key = `${v.id}|${normalizePkg(v.pkg)}`;
+                        if (!baseKeys.has(key)) {
+                          updated[key] = "patched";
+                        }
+                      });
+                      return updated;
+                    });
+                  }
+
+                  // Update the base report to the new scan. DO NOT switch tabs.
+                  setBaseVulns(parsed);
                   setScanDate(newScanDate);
-                  setSeverityFilter("ALL");
-                  setSearchQuery("");
                 });
             }, 3000); // Give Vercel ~3s to deploy
           } else if (data.lastScanOk === false) {
@@ -455,13 +453,25 @@ export default function App() {
     return s;
   }, [baseVulns]);
 
+  const uploadedIdSet = useMemo(() => {
+  const s = new Set();
+  if (uploadedVulns) {
+    uploadedVulns.forEach((v) => s.add(`${v.id}|${normalizePkg(v.pkg)}`));
+  }
+  return s;
+}, [uploadedVulns]);
+
   const filtered = useMemo(() => {
     let list = [...vulns];
     if (severityFilter === "NEW") {
-      list = list.filter((v) => {
-        const key = `${v.id}|${normalizePkg(v.pkg)}`;
-        return !baseIdSet.has(key) && (patchStatus[key] || "open") !== "patched";
-      });
+      if (isBase && uploadedVulns) {
+        list = list.filter((v) => {
+          const key = `${v.id}|${normalizePkg(v.pkg)}`;
+          return !uploadedIdSet.has(key) && (patchStatus[key] || "open") !== "patched";
+        });
+      } else {
+        list = []; // No comparison possible if no uploaded report or not on base view
+      }
     } else if (severityFilter !== "ALL") {
       list = list.filter((v) => v.severity === severityFilter);
     }
@@ -512,6 +522,25 @@ export default function App() {
       } else {
         parsed = parseTrivyHtml(content);
       }
+      // Uploaded is ALWAYS older. Base is ALWAYS newer.
+      // Patched = exists in uploaded, but MISSING from base.
+      const baseKeys = new Set(baseVulns.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
+      setPatchStatus((prev) => {
+        const updated = { ...prev };
+        parsed.forEach((v) => {
+          const key = `${v.id}|${normalizePkg(v.pkg)}`;
+          if (!baseKeys.has(key)) {
+            updated[key] = "patched";
+          }
+        });
+        return updated;
+      });
+
+      setUploadedVulns(parsed);
+      setActiveView("uploaded");
+      setSeverityFilter("ALL");
+      setSearchQuery("");
+    };
 
       const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${normalizePkg(v.pkg)}`));
       setPatchStatus((prev) => {
@@ -705,9 +734,9 @@ export default function App() {
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
               { key: "ALL",        label: `All (${vulns.length})` },
-              ...(!isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => {
+              ...(isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => {
                 const k = `${v.id}|${normalizePkg(v.pkg)}`;
-                return !baseIdSet.has(k) && (patchStatus[k] || "open") !== "patched";
+                return !uploadedIdSet.has(k) && (patchStatus[k] || "open") !== "patched";
               }).length})` }] : []),
               { key: "CRITICAL",   label: `Critical (${counts.CRITICAL})` },
               { key: "HIGH",       label: `High (${counts.HIGH})` },
@@ -783,7 +812,7 @@ export default function App() {
               const status  = patchStatus[key] || "open";
               const isExp   = expandedRow === key;
               const isPatched = status === "patched";
-              const isNew   = !isBase && !baseIdSet.has(key) && status !== "patched";
+              const isNew = isBase && uploadedVulns && !uploadedIdSet.has(key) && status !== "patched";
               const rowBg   = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
 
               return (
