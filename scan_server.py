@@ -38,9 +38,10 @@ import os
 import subprocess
 import threading
 import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-import urllib.request
+
 
 try:
     from flask import Flask, jsonify, request
@@ -242,13 +243,16 @@ if __name__ == "__main__":
 
 # ── AI Remediation Routes ──────────────────────────────────────────────────────
 
+# ── AI Remediation Routes ──────────────────────────────────────────────────────
+
 def call_ollama(prompt: str) -> str:
     """Send a prompt to local Ollama and get a JSON response."""
+    import urllib.request
     data = json.dumps({
         "model": "qwen2.5:7b",
         "prompt": prompt,
         "stream": False,
-        "format": "json"  # Forces Ollama to output valid JSON
+        "format": "json"
     }).encode('utf-8')
     
     req = urllib.request.Request(
@@ -257,15 +261,17 @@ def call_ollama(prompt: str) -> str:
         headers={"Content-Type": "application/json"}
     )
     try:
-        # Timeout set to 120s because AI might take a moment to think
         with urllib.request.urlopen(req, timeout=120) as resp:
             return json.loads(resp.read().decode('utf-8'))['response']
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-@app.route("/remediate", methods=["POST"])
+@app.route("/remediate", methods=["POST", "OPTIONS"])
 def remediate():
-    """Analyze base-report.json with AI and return fix suggestions."""
+    # 1. Handle the browser's CORS preflight test
+    if request.method == "OPTIONS":
+        return _add_cors(app.response_class(status=204))
+
     if not _check_token():
         return jsonify({"error": "Unauthorized"}), 401
         
@@ -289,13 +295,11 @@ def remediate():
                     "version": v.get("InstalledVersion")
                 })
     
-    # Limit to first 30 to prevent token exhaustion / timeouts
-    vulns_for_ai = vulns_for_ai[:30] 
+    vulns_for_ai = vulns_for_ai[:30] # Limit to 30 to prevent timeouts
     
     if not vulns_for_ai:
         return jsonify({"fixes": [], "message": "No critical/high vulnerabilities to analyze."})
 
-    # The Prompt: Strict rules for the AI
     prompt = f"""You are an expert Linux system administrator. You are given a list of vulnerabilities from a Trivy scan of a Docker container running on Debian/Ubuntu.
 Your goal is to suggest SAFE, non-destructive commands to fix these vulnerabilities using the package manager.
 The container name is "sandbox-opensilex-docker-opensilexapp".
@@ -313,29 +317,30 @@ Vulnerabilities:
     ai_response = call_ollama(prompt)
     
     try:
-        # Ollama returns the raw string, we parse it
         fixes = json.loads(ai_response)
         if isinstance(fixes, dict) and "fixes" in fixes:
-            fixes = fixes["fixes"] # Handle case where AI wraps it in an object
+            fixes = fixes["fixes"]
         return jsonify({"fixes": fixes})
     except json.JSONDecodeError:
         return jsonify({"fixes": [], "error": "AI returned invalid JSON", "raw": ai_response})
 
-@app.route("/apply-fix", methods=["POST"])
+@app.route("/apply-fix", methods=["POST", "OPTIONS"])
 def apply_fix():
-    """Execute a consented command on Kali."""
+    # 1. Handle the browser's CORS preflight test
+    if request.method == "OPTIONS":
+        return _add_cors(app.response_class(status=204))
+
     if not _check_token():
         return jsonify({"error": "Unauthorized"}), 401
         
     body = request.get_json(silent=True) or {}
     cmd = body.get("command", "")
     
-    # 🛡️SECURITY CHECK: Only allow apt-get updates inside the specific container
+    # Security check: Only allow apt-get updates inside the specific container
     if not cmd.startswith("docker exec sandbox-opensilex-docker-opensilexapp apt-get"):
-        return jsonify({"error": "Command rejected by security policy. Must be an apt-get command for the target container."}), 403
+        return jsonify({"error": "Command rejected by security policy."}), 403
 
     try:
-        # Execute the command
         result = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=120
         )
