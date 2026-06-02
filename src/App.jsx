@@ -95,18 +95,21 @@ const nvdUrl = (id) =>
   id.startsWith("GHSA-")
     ? `https://github.com/advisories/${id}`
     : `https://nvd.nist.gov/vuln/detail/${id}`;
+
 const isGhsa = (id) => id.startsWith("GHSA-");
+
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, NEGLIGIBLE: 4 };
 const SEV_STYLE = {
-  CRITICAL:   { bg: "#e8193c", glow: "#e8193c55" },
-  HIGH:       { bg: "#f97316", glow: "#f9731655" },
-  MEDIUM:     { bg: "#eab308", glow: "#eab30855" },
-  LOW:        { bg: "#6b7280", glow: "#6b728055" },
+  CRITICAL: { bg: "#e8193c", glow: "#e8193c55" },
+  HIGH: { bg: "#f97316", glow: "#f9731655" },
+  MEDIUM: { bg: "#eab308", glow: "#eab30855" },
+  LOW: { bg: "#6b7280", glow: "#6b728055" },
   NEGLIGIBLE: { bg: "#374151", glow: "#37415155" },
 };
+
 const STATUS_CYCLE = ["open", "patched", "ignored"];
 const STATUS_STYLE = {
-  open:    { bg: "#1e293b", color: "#94a3b8", border: "#334155", label: "Open" },
+  open: { bg: "#1e293b", color: "#94a3b8", border: "#334155", label: "Open" },
   patched: { bg: "#052e16", color: "#4ade80", border: "#166534", label: "✓ Patched" },
   ignored: { bg: "#1c1917", color: "#a8a29e", border: "#44403c", label: "~ Ignored" },
 };
@@ -184,11 +187,11 @@ function PulseDot({ color = "#4ade80" }) {
 function AutoscanButton({ scanState, onScan, T }) {
   const isActive = scanState === SCAN_STATE.STARTING || scanState === SCAN_STATE.RUNNING;
   const stateConfig = {
-    [SCAN_STATE.IDLE]:     { label: "⟳ Autoscan", bg: "#0ea5e9", shadow: "#0ea5e955" },
+    [SCAN_STATE.IDLE]: { label: "⟳ Autoscan", bg: "#0ea5e9", shadow: "#0ea5e955" },
     [SCAN_STATE.STARTING]: { label: "Connecting…", bg: "#6366f1", shadow: "#6366f155" },
-    [SCAN_STATE.RUNNING]:  { label: "Scanning…", bg: "#8b5cf6", shadow: "#8b5cf655" },
-    [SCAN_STATE.SUCCESS]:  { label: "✓ Scan sent", bg: "#10b981", shadow: "#10b98155" },
-    [SCAN_STATE.ERROR]:    { label: "✕ Failed", bg: "#ef4444", shadow: "#ef444455" },
+    [SCAN_STATE.RUNNING]: { label: "Scanning…", bg: "#8b5cf6", shadow: "#8b5cf655" },
+    [SCAN_STATE.SUCCESS]: { label: "✓ Scan sent", bg: "#10b981", shadow: "#10b98155" },
+    [SCAN_STATE.ERROR]: { label: "✕ Failed", bg: "#ef4444", shadow: "#ef444455" },
   };
   const cfg = stateConfig[scanState] || stateConfig[SCAN_STATE.IDLE];
   return (
@@ -277,11 +280,17 @@ export default function App() {
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState(null);
   const [scanDate, setScanDate] = useState(null);
-  
   const [scanState, setScanState] = useState(SCAN_STATE.IDLE);
   const [scanLog, setScanLog] = useState([]);
   const [showLog, setShowLog] = useState(false);
   const [scanErrorMsg, setScanErrorMsg] = useState("");
+  
+  // AI Remediation State
+  const [aiFixes, setAiFixes] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [consentModal, setConsentModal] = useState(null);
+  const [applyStatus, setApplyStatus] = useState(null);
+
   const pollTimerRef = useRef(null);
   const fileRef = useRef();
 
@@ -298,13 +307,11 @@ export default function App() {
 
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-
     pollTimerRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${SCAN_SERVER_URL}/status`);
         if (!res.ok) return;
         const data = await res.json();
-
         setScanLog(data.log || []);
 
         if (!data.running) {
@@ -320,6 +327,7 @@ export default function App() {
                   const parsed = parseTrivyHtml(html);
                   const newScanDate = parseScanDate(html);
 
+                  // If an uploaded (older) report exists, re-evaluate "patched" against the NEW base report
                   if (uploadedVulns) {
                     const baseKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
                     setPatchStatus((prev) => {
@@ -334,6 +342,7 @@ export default function App() {
                     });
                   }
 
+                  // Update the base report to the new scan. DO NOT switch tabs.
                   setBaseVulns(parsed);
                   setScanDate(newScanDate);
                 });
@@ -342,7 +351,6 @@ export default function App() {
             setScanState(SCAN_STATE.ERROR);
             setScanErrorMsg("Scan failed. Check the log for details.");
           }
-
           setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
         } else {
           setScanState(SCAN_STATE.RUNNING);
@@ -363,7 +371,6 @@ export default function App() {
     setScanLog([]);
     setScanErrorMsg("");
     setShowLog(true);
-
     try {
       const res = await fetch(`${SCAN_SERVER_URL}/scan`, {
         method: "POST",
@@ -400,9 +407,9 @@ export default function App() {
   }, [scanState, startPolling]);
 
   const vulns = activeView === "base" ? baseVulns : (uploadedVulns || []);
-  
+
   useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
-  
+
   const counts = useMemo(() => {
     const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, NEGLIGIBLE: 0 };
     vulns.forEach((v) => { if (c[v.severity] !== undefined) c[v.severity]++; });
@@ -437,7 +444,7 @@ export default function App() {
     } else if (severityFilter !== "ALL") {
       list = list.filter((v) => v.severity === severityFilter);
     }
-    
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((v) =>
@@ -446,7 +453,7 @@ export default function App() {
         v.title?.toLowerCase().includes(q)
       );
     }
-    
+
     if (sortCol && sortDir) {
       list.sort((a, b) => {
         if (sortCol === "severity") {
@@ -486,6 +493,8 @@ export default function App() {
         parsed = parseTrivyHtml(content);
       }
 
+      // Uploaded is ALWAYS older. Base is ALWAYS newer.
+      // Patched = exists in uploaded, but MISSING from base.
       const baseKeys = new Set(baseVulns.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
       setPatchStatus((prev) => {
         const updated = { ...prev };
@@ -637,6 +646,36 @@ export default function App() {
 
           <AutoscanButton scanState={scanState} onScan={handleAutoscan} T={T} />
 
+          <button 
+            onClick={async () => {
+              if (aiLoading) return;
+              setAiLoading(true);
+              setAiFixes([]);
+              try {
+                const res = await fetch(`${SCAN_SERVER_URL}/remediate`, {
+                  method: "POST",
+                  headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (data.fixes) setAiFixes(data.fixes);
+                else alert("AI Error: " + (data.error || "Unknown"));
+              } catch (e) {
+                alert("Could not reach AI server: " + e.message);
+              }
+              setAiLoading(false);
+            }}
+            disabled={aiLoading}
+            style={{
+              background: aiLoading ? "#6b7280" : "#8b5cf6", color: "#fff", border: "none",
+              padding: "6px 18px", borderRadius: 6, cursor: aiLoading ? "not-allowed" : "pointer",
+              fontSize: 12, fontWeight: 700, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8,
+              boxShadow: "0 0 14px #8b5cf655", whiteSpace: "nowrap"
+            }}
+          >
+            {aiLoading ? "🧠 Thinking..." : "🤖 Remediate with AI"}
+          </button>
+
           {(scanLog.length > 0 || scanState !== SCAN_STATE.IDLE) && (
             <button onClick={() => setShowLog((s) => !s)} style={{
               background: showLog ? "#0ea5e920" : T.surface2,
@@ -706,6 +745,7 @@ export default function App() {
             }}>
               {[
                 { label: "Severity", col: "severity" },
+                { label: "AI Fix", col: null },
                 { label: "Title / Package", col: "title" },
                 { label: "CVE / ID", col: "id" },
                 { label: "Status", col: null },
@@ -762,6 +802,25 @@ export default function App() {
                     onMouseLeave={(e) => e.currentTarget.style.background = rowBg}
                   >
                     <div><SevBadge level={v.severity} /></div>
+                    
+                    <div>
+                      {(() => {
+                        const fix = aiFixes.find(f => f.cve === v.id && f.pkg === v.pkg);
+                        if (fix) {
+                          return (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setConsentModal(fix); setApplyStatus(null); }}
+                              title="Click to review AI fix"
+                              style={{
+                                background: "#8b5cf620", border: "1px solid #8b5cf6", color: "#8b5cf6",
+                                padding: "2px 8px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700
+                              }}
+                            >🤖 Fix</button>
+                          );
+                        }
+                        return <span style={{ color: T.subtext, fontSize: 10 }}>—</span>;
+                      })()}
+                    </div>
 
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4, marginBottom: 3, display: "flex", alignItems: "center", gap: 8 }}>
@@ -893,6 +952,71 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {consentModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+        }}>
+          <div style={{
+            background: T.surface, border: `2px solid #8b5cf6`, borderRadius: 12,
+            padding: 24, maxWidth: 600, width: "100%", boxShadow: "0 0 30px #8b5cf655"
+          }}>
+            <h3 style={{ margin: "0 0 12px 0", color: "#8b5cf6", fontSize: 18 }}>🤖 AI Remediation Consent</h3>
+            <div style={{ background: T.surface2, padding: 12, borderRadius: 6, marginBottom: 16, border: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 11, color: T.subtext, marginBottom: 4, fontWeight: 700 }}>CVE:</div>
+              <div style={{ fontSize: 14, color: T.text, fontFamily: "'DM Mono', monospace" }}>{consentModal.cve} ({consentModal.pkg})</div>
+              
+              <div style={{ fontSize: 11, color: T.subtext, marginTop: 12, marginBottom: 4, fontWeight: 700 }}>AI Explanation:</div>
+              <div style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}>{consentModal.explanation}</div>
+              
+              <div style={{ fontSize: 11, color: T.subtext, marginTop: 12, marginBottom: 4, fontWeight: 700 }}>Command to Execute:</div>
+              <code style={{ 
+                display: "block", background: "#000", color: "#4ade80", padding: 10, borderRadius: 4, 
+                fontSize: 12, fontFamily: "'DM Mono', monospace", wordBreak: "break-all" 
+              }}>
+                {consentModal.command}
+              </code>
+            </div>
+
+            {applyStatus && (
+              <div style={{ 
+                padding: 10, borderRadius: 6, marginBottom: 16, fontSize: 12, fontFamily: "'DM Mono', monospace",
+                background: applyStatus.success ? "#052e16" : "#3f0f0f",
+                color: applyStatus.success ? "#4ade80" : "#f87171",
+                border: `1px solid ${applyStatus.success ? "#166534" : "#7f1d1d"}`
+              }}>
+                {applyStatus.success ? "✅ Fix applied successfully! Run Autoscan to verify." : "❌ Error: " + applyStatus.error}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button onClick={() => setConsentModal(null)} style={{
+                background: "transparent", border: `1px solid ${T.border}`, color: T.subtext,
+                padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 600
+              }}>Cancel</button>
+              <button onClick={async () => {
+                setApplyStatus(null);
+                try {
+                  const res = await fetch(`${SCAN_SERVER_URL}/apply-fix`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: consentModal.command })
+                  });
+                  const data = await res.json();
+                  setApplyStatus(data);
+                } catch (e) {
+                  setApplyStatus({ success: false, error: e.message });
+                }
+              }} style={{
+                background: "#8b5cf6", border: "none", color: "#fff",
+                padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 700,
+                boxShadow: "0 0 10px #8b5cf655"
+              }}>✅ Consent & Execute</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ScanLogDrawer log={scanLog} show={showLog} onClose={() => setShowLog(false)} T={T} />
     </div>
