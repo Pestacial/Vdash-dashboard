@@ -1,12 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
-// ── Config — update these to match your deployment ───────────────────────────
 const SCAN_SERVER_URL = "https://100.95.217.28:5000";
-// Set your SCAN_TOKEN here, or load it from a build-time env var:
-//   VITE_SCAN_TOKEN=your_token npm run build
 const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function normalizePkg(pkg) {
   return pkg.trim();
 }
@@ -14,7 +10,6 @@ function normalizePkg(pkg) {
 function parseTrivyJson(text) {
   try {
     const data = JSON.parse(text);
-    // Handle our envelope format: { scanDate, results: <trivy json> }
     const raw = data.results !== undefined ? data.results : data;
     const vulns = [];
     const reports = Array.isArray(raw) ? raw : [raw];
@@ -35,7 +30,6 @@ function parseTrivyJson(text) {
         });
       });
     });
-    // Extract scan date from envelope if present
     const scanDate = data.scanDate ? new Date(data.scanDate) : null;
     return { vulns, scanDate };
   } catch (e) {
@@ -45,7 +39,7 @@ function parseTrivyJson(text) {
 }
 
 function parseTrivyHtml(html) {
-  const scan2htmlMatch = html.match(/i9=(\[\s*\{[\s\S]*?\}\s*\])\s*[,;]/);
+  const scan2htmlMatch = html.match(/i9=([\s\S]*?)\s*[,;]/);
   if (scan2htmlMatch) {
     try {
       const data = JSON.parse(scan2htmlMatch[1]);
@@ -72,7 +66,6 @@ function parseTrivyHtml(html) {
       console.warn("scan2html parse failed, falling back", e);
     }
   }
-
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const rows = doc.querySelectorAll("table tr");
@@ -102,11 +95,8 @@ const nvdUrl = (id) =>
   id.startsWith("GHSA-")
     ? `https://github.com/advisories/${id}`
     : `https://nvd.nist.gov/vuln/detail/${id}`;
-
 const isGhsa = (id) => id.startsWith("GHSA-");
-
 const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, NEGLIGIBLE: 4 };
-
 const SEV_STYLE = {
   CRITICAL:   { bg: "#e8193c", glow: "#e8193c55" },
   HIGH:       { bg: "#f97316", glow: "#f9731655" },
@@ -114,7 +104,6 @@ const SEV_STYLE = {
   LOW:        { bg: "#6b7280", glow: "#6b728055" },
   NEGLIGIBLE: { bg: "#374151", glow: "#37415155" },
 };
-
 const STATUS_CYCLE = ["open", "patched", "ignored"];
 const STATUS_STYLE = {
   open:    { bg: "#1e293b", color: "#94a3b8", border: "#334155", label: "Open" },
@@ -122,13 +111,12 @@ const STATUS_STYLE = {
   ignored: { bg: "#1c1917", color: "#a8a29e", border: "#44403c", label: "~ Ignored" },
 };
 
-// Scan UI states
 const SCAN_STATE = {
-  IDLE:     "idle",
+  IDLE: "idle",
   STARTING: "starting",
-  RUNNING:  "running",
-  SUCCESS:  "success",
-  ERROR:    "error",
+  RUNNING: "running",
+  SUCCESS: "success",
+  ERROR: "error",
 };
 
 function formatDate(d) {
@@ -142,12 +130,10 @@ function formatDate(d) {
 function timeSince(d) {
   if (!d) return null;
   const sec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (sec < 60)  return `${sec}s ago`;
+  if (sec < 60) return `${sec}s ago`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
   return `${Math.floor(sec / 3600)}h ago`;
 }
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SevBadge({ level }) {
   const s = SEV_STYLE[level] || { bg: "#374151", glow: "#37415155" };
@@ -179,17 +165,10 @@ function StatusBtn({ status, onClick }) {
   );
 }
 
-// Pulsing dot indicator
 function PulseDot({ color = "#4ade80" }) {
   return (
     <span style={{ position: "relative", display: "inline-block", width: 8, height: 8 }}>
-      <style>{`
-        @keyframes ping {
-          0%   { transform: scale(1);   opacity: 0.8; }
-          70%  { transform: scale(2.2); opacity: 0; }
-          100% { transform: scale(2.2); opacity: 0; }
-        }
-      `}</style>
+      <style>{`@keyframes ping { 0% { transform: scale(1); opacity: 0.8; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }`}</style>
       <span style={{
         position: "absolute", inset: 0, borderRadius: "50%",
         background: color, animation: "ping 1.2s ease-out infinite",
@@ -202,20 +181,16 @@ function PulseDot({ color = "#4ade80" }) {
   );
 }
 
-// Autoscan button with states
 function AutoscanButton({ scanState, onScan, T }) {
   const isActive = scanState === SCAN_STATE.STARTING || scanState === SCAN_STATE.RUNNING;
-
   const stateConfig = {
-    [SCAN_STATE.IDLE]:     { label: "⟳  Autoscan",   bg: "#0ea5e9", shadow: "#0ea5e955" },
-    [SCAN_STATE.STARTING]: { label: "Connecting…",    bg: "#6366f1", shadow: "#6366f155" },
-    [SCAN_STATE.RUNNING]:  { label: "Scanning…",      bg: "#8b5cf6", shadow: "#8b5cf655" },
-    [SCAN_STATE.SUCCESS]:  { label: "✓  Scan sent",   bg: "#10b981", shadow: "#10b98155" },
-    [SCAN_STATE.ERROR]:    { label: "✕  Failed",      bg: "#ef4444", shadow: "#ef444455" },
+    [SCAN_STATE.IDLE]:     { label: "⟳ Autoscan", bg: "#0ea5e9", shadow: "#0ea5e955" },
+    [SCAN_STATE.STARTING]: { label: "Connecting…", bg: "#6366f1", shadow: "#6366f155" },
+    [SCAN_STATE.RUNNING]:  { label: "Scanning…", bg: "#8b5cf6", shadow: "#8b5cf655" },
+    [SCAN_STATE.SUCCESS]:  { label: "✓ Scan sent", bg: "#10b981", shadow: "#10b98155" },
+    [SCAN_STATE.ERROR]:    { label: "✕ Failed", bg: "#ef4444", shadow: "#ef444455" },
   };
-
   const cfg = stateConfig[scanState] || stateConfig[SCAN_STATE.IDLE];
-
   return (
     <button
       onClick={onScan}
@@ -239,7 +214,6 @@ function AutoscanButton({ scanState, onScan, T }) {
   );
 }
 
-// Compact scan log drawer
 function ScanLogDrawer({ log, show, onClose, T }) {
   if (!show) return null;
   return (
@@ -270,50 +244,47 @@ function ScanLogDrawer({ log, show, onClose, T }) {
         {log.length === 0
           ? <span style={{ color: T.subtext }}>No log output yet…</span>
           : log.map((line, i) => {
-            const col = line.includes("ERROR") || line.includes("FAIL")
-              ? "#f87171"
-              : line.includes("Done") || line.includes("successfully") || line.includes("✓")
-              ? "#4ade80"
-              : line.startsWith("[git]")
-              ? "#818cf8"
-              : T.text;
-            return (
-              <div key={i} style={{ color: col, wordBreak: "break-all" }}>{line}</div>
-            );
-          })
-        }
+              const col = line.includes("ERROR") || line.includes("FAIL")
+                ? "#f87171"
+                : line.includes("Done") || line.includes("successfully") || line.includes("✓")
+                ? "#4ade80"
+                : line.startsWith("[git]")
+                ? "#818cf8"
+                : T.text;
+              return (
+                <div key={i} style={{ color: col, wordBreak: "break-all" }}>{line}</div>
+              );
+            })}
       </div>
     </div>
   );
 }
 
-// ── Main App ───────────────────────────────────────────────────────────────────
 export default function App() {
-  const [baseVulns, setBaseVulns]             = useState([]);
-  const [uploadedVulns, setUploadedVulns]     = useState(null);
-  const [uploadedName, setUploadedName]       = useState("");
-  const [activeView, setActiveView]           = useState("base");
-  const [severityFilter, setSeverityFilter]   = useState("ALL");
-  const [searchQuery, setSearchQuery]         = useState("");
-  const [patchStatus, setPatchStatus]         = useState({});
-  const [expandedRow, setExpandedRow]         = useState(null);
-  const [darkMode, setDarkMode]               = useState(false);
-  const [pageSize, setPageSize]               = useState(20);
-  const [page, setPage]                       = useState(1);
-  const [baseLoading, setBaseLoading]         = useState(true);
-  const [baseError, setBaseError]             = useState(false);
-  const [sortCol, setSortCol]                 = useState(null);
-  const [sortDir, setSortDir]                 = useState(null);
-  const [scanDate, setScanDate]               = useState(null);
-  // Autoscan state
-  const [scanState, setScanState]             = useState(SCAN_STATE.IDLE);
-  const [scanLog, setScanLog]                 = useState([]);
-  const [showLog, setShowLog]                 = useState(false);
-  const [scanErrorMsg, setScanErrorMsg]       = useState("");
-  const pollTimerRef                          = useRef(null);
-  const fileRef                               = useRef();
+  const [baseVulns, setBaseVulns] = useState([]);
+  const [uploadedVulns, setUploadedVulns] = useState(null);
+  const [uploadedName, setUploadedName] = useState("");
+  const [activeView, setActiveView] = useState("base");
+  const [severityFilter, setSeverityFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [patchStatus, setPatchStatus] = useState({});
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
+  const [baseLoading, setBaseLoading] = useState(true);
+  const [baseError, setBaseError] = useState(false);
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState(null);
+  const [scanDate, setScanDate] = useState(null);
+  
+  const [scanState, setScanState] = useState(SCAN_STATE.IDLE);
+  const [scanLog, setScanLog] = useState([]);
+  const [showLog, setShowLog] = useState(false);
+  const [scanErrorMsg, setScanErrorMsg] = useState("");
+  const pollTimerRef = useRef(null);
+  const fileRef = useRef();
 
-  // ── Load base report ────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/base-report.html")
       .then((r) => { if (!r.ok) throw new Error("Not found"); return r.text(); })
@@ -325,7 +296,6 @@ export default function App() {
       .catch(() => { setBaseError(true); setBaseLoading(false); });
   }, []);
 
-  // ── Poll scan status while running ─────────────────────────────────────────
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
 
@@ -343,7 +313,6 @@ export default function App() {
 
           if (data.lastScanOk === true) {
             setScanState(SCAN_STATE.SUCCESS);
-            // Reload the base report to pick up the new data
             setTimeout(() => {
               fetch("/base-report.html?bust=" + Date.now())
                 .then((r) => r.text())
@@ -351,7 +320,6 @@ export default function App() {
                   const parsed = parseTrivyHtml(html);
                   const newScanDate = parseScanDate(html);
 
-                  // If an uploaded (old) report exists, re-evaluate "patched" against the NEW base report
                   if (uploadedVulns) {
                     const baseKeys = new Set(parsed.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
                     setPatchStatus((prev) => {
@@ -366,17 +334,15 @@ export default function App() {
                     });
                   }
 
-                  // Update the base report to the new scan. DO NOT switch tabs.
                   setBaseVulns(parsed);
                   setScanDate(newScanDate);
                 });
-            }, 3000); // Give Vercel ~3s to deploy
+            }, 3000);
           } else if (data.lastScanOk === false) {
             setScanState(SCAN_STATE.ERROR);
             setScanErrorMsg("Scan failed. Check the log for details.");
           }
 
-          // Auto-reset button after 8s
           setTimeout(() => setScanState(SCAN_STATE.IDLE), 8000);
         } else {
           setScanState(SCAN_STATE.RUNNING);
@@ -385,16 +351,14 @@ export default function App() {
         // Network error while polling — keep trying
       }
     }, 2000);
-  }, []);
+  }, [uploadedVulns]);
 
   useEffect(() => {
     return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
   }, []);
 
-  // ── Autoscan trigger ────────────────────────────────────────────────────────
   const handleAutoscan = useCallback(async () => {
     if (scanState === SCAN_STATE.STARTING || scanState === SCAN_STATE.RUNNING) return;
-
     setScanState(SCAN_STATE.STARTING);
     setScanLog([]);
     setScanErrorMsg("");
@@ -427,7 +391,6 @@ export default function App() {
 
       setScanState(SCAN_STATE.RUNNING);
       startPolling();
-
     } catch (e) {
       setScanState(SCAN_STATE.ERROR);
       setScanErrorMsg(`Could not reach scan server at ${SCAN_SERVER_URL}. Is it running on Kali?`);
@@ -436,11 +399,10 @@ export default function App() {
     }
   }, [scanState, startPolling]);
 
-  // ── Data derivations ────────────────────────────────────────────────────────
   const vulns = activeView === "base" ? baseVulns : (uploadedVulns || []);
-
+  
   useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
-
+  
   const counts = useMemo(() => {
     const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, NEGLIGIBLE: 0 };
     vulns.forEach((v) => { if (c[v.severity] !== undefined) c[v.severity]++; });
@@ -454,27 +416,28 @@ export default function App() {
   }, [baseVulns]);
 
   const uploadedIdSet = useMemo(() => {
-  const s = new Set();
-  if (uploadedVulns) {
-    uploadedVulns.forEach((v) => s.add(`${v.id}|${normalizePkg(v.pkg)}`));
-  }
-  return s;
-}, [uploadedVulns]);
+    const s = new Set();
+    if (uploadedVulns) {
+      uploadedVulns.forEach((v) => s.add(`${v.id}|${normalizePkg(v.pkg)}`));
+    }
+    return s;
+  }, [uploadedVulns]);
 
   const filtered = useMemo(() => {
     let list = [...vulns];
     if (severityFilter === "NEW") {
-      if (isBase && uploadedVulns) {
+      if (activeView === "base" && uploadedVulns) {
         list = list.filter((v) => {
           const key = `${v.id}|${normalizePkg(v.pkg)}`;
           return !uploadedIdSet.has(key) && (patchStatus[key] || "open") !== "patched";
         });
       } else {
-        list = []; // No comparison possible if no uploaded report or not on base view
+        list = [];
       }
     } else if (severityFilter !== "ALL") {
       list = list.filter((v) => v.severity === severityFilter);
     }
+    
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((v) =>
@@ -483,6 +446,7 @@ export default function App() {
         v.title?.toLowerCase().includes(q)
       );
     }
+    
     if (sortCol && sortDir) {
       list.sort((a, b) => {
         if (sortCol === "severity") {
@@ -500,10 +464,10 @@ export default function App() {
       list.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     }
     return list;
-  }, [vulns, severityFilter, searchQuery, sortCol, sortDir, baseIdSet, patchStatus]);
+  }, [vulns, severityFilter, searchQuery, sortCol, sortDir, baseIdSet, uploadedIdSet, patchStatus, activeView]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const handleUpload = (e) => {
     const file = e.target.files[0];
@@ -512,9 +476,8 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const content = ev.target.result;
-      const isJson  = file.name.toLowerCase().endsWith(".json");
+      const isJson = file.name.toLowerCase().endsWith(".json");
       let parsed, uploadScanDate = null;
-
       if (isJson) {
         const result = parseTrivyJson(content);
         parsed = result.vulns;
@@ -522,8 +485,7 @@ export default function App() {
       } else {
         parsed = parseTrivyHtml(content);
       }
-      // Uploaded is ALWAYS older. Base is ALWAYS newer.
-      // Patched = exists in uploaded, but MISSING from base.
+
       const baseKeys = new Set(baseVulns.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
       setPatchStatus((prev) => {
         const updated = { ...prev };
@@ -541,42 +503,25 @@ export default function App() {
       setSeverityFilter("ALL");
       setSearchQuery("");
     };
-
-      const uploadedKeys = new Set(parsed.map((v) => `${v.id}|${normalizePkg(v.pkg)}`));
-      setPatchStatus((prev) => {
-        const updated = { ...prev };
-        baseVulns.forEach((v) => {
-          const key = `${v.id}|${normalizePkg(v.pkg)}`;
-          if (!uploadedKeys.has(key) && !prev[key]) updated[key] = "patched";
-        });
-        return updated;
-      });
-
-      setUploadedVulns(parsed);
-      setActiveView("uploaded");
-      setSeverityFilter("ALL");
-      setSearchQuery("");
-    };
     reader.readAsText(file);
     e.target.value = "";
   };
 
   const handleSort = (col) => {
-    if (sortCol !== col)     { setSortCol(col); setSortDir("asc"); }
-    else if (sortDir === "asc")  setSortDir("desc");
-    else                     { setSortCol(null); setSortDir(null); }
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortCol(null); setSortDir(null); }
   };
 
   const cycleStatus = (e, key) => {
     e.stopPropagation();
     setPatchStatus((prev) => {
-      const cur  = prev[key] || "open";
+      const cur = prev[key] || "open";
       const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
       return { ...prev, [key]: next };
     });
   };
 
-  // ── Theme ───────────────────────────────────────────────────────────────────
   const T = darkMode ? {
     bg: "#080f1a", surface: "#0d1829", surface2: "#111f33",
     border: "#1a2d48", text: "#c8daf0", subtext: "#4a6080",
@@ -587,7 +532,7 @@ export default function App() {
     hover: "#eef3fc", accent: "#2563eb",
   };
 
-  const isBase  = activeView === "base";
+  const isBase = activeView === "base";
   const gridCols = isBase
     ? "110px minmax(0, 1fr) 180px 100px 100px"
     : "110px minmax(0, 1fr) 180px 100px";
@@ -595,8 +540,7 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", width: "100%", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-
-      {/* ── Topbar ── */}
+      
       <div style={{
         position: "sticky", top: 0, zIndex: 200,
         background: T.surface, borderBottom: `1px solid ${T.border}`,
@@ -604,7 +548,6 @@ export default function App() {
         padding: "0 8px", height: 52,
         boxShadow: darkMode ? "0 2px 20px #00000060" : "0 2px 10px #0000001a",
       }}>
-        {/* Left */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "nowrap", overflow: "hidden" }}>
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, color: T.accent, letterSpacing: 2, flexShrink: 0 }}>
             ▸ VULNDASH
@@ -631,7 +574,6 @@ export default function App() {
               }}>↑ {uploadedName}</button>
           )}
 
-          {/* Last scan timestamp pill */}
           {scanDate && isBase && (
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
@@ -648,7 +590,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Scan error inline */}
           {scanState === SCAN_STATE.ERROR && scanErrorMsg && (
             <span style={{
               fontSize: 11, color: "#f87171", fontFamily: "'DM Mono', monospace",
@@ -661,7 +602,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Right */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search CVE, package, title…"
@@ -695,10 +635,8 @@ export default function App() {
             fontSize: 12, fontWeight: 600, fontFamily: "inherit",
           }}>↑ Upload</button>
 
-          {/* Autoscan button */}
           <AutoscanButton scanState={scanState} onScan={handleAutoscan} T={T} />
 
-          {/* Log toggle — only show when there's a log */}
           {(scanLog.length > 0 || scanState !== SCAN_STATE.IDLE) && (
             <button onClick={() => setShowLog((s) => !s)} style={{
               background: showLog ? "#0ea5e920" : T.surface2,
@@ -712,9 +650,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Content ── */}
       <div style={{ padding: "16px 12px", width: "100%", boxSizing: "border-box" }}>
-
         {baseLoading && activeView === "base" && (
           <div style={{ color: T.subtext, fontSize: 13, padding: 40, textAlign: "center" }}>
             Loading base report…
@@ -729,23 +665,22 @@ export default function App() {
           </div>
         )}
 
-        {/* Severity pills */}
         {!baseLoading && (
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", paddingLeft: 2 }}>
             {[
-              { key: "ALL",        label: `All (${vulns.length})` },
+              { key: "ALL", label: `All (${vulns.length})` },
               ...(isBase && uploadedVulns ? [{ key: "NEW", label: `New (${vulns.filter(v => {
                 const k = `${v.id}|${normalizePkg(v.pkg)}`;
                 return !uploadedIdSet.has(k) && (patchStatus[k] || "open") !== "patched";
               }).length})` }] : []),
-              { key: "CRITICAL",   label: `Critical (${counts.CRITICAL})` },
-              { key: "HIGH",       label: `High (${counts.HIGH})` },
-              { key: "MEDIUM",     label: `Medium (${counts.MEDIUM})` },
-              { key: "LOW",        label: `Low (${counts.LOW})` },
+              { key: "CRITICAL", label: `Critical (${counts.CRITICAL})` },
+              { key: "HIGH", label: `High (${counts.HIGH})` },
+              { key: "MEDIUM", label: `Medium (${counts.MEDIUM})` },
+              { key: "LOW", label: `Low (${counts.LOW})` },
               { key: "NEGLIGIBLE", label: `Negligible (${counts.NEGLIGIBLE})` },
             ].map(({ key, label }) => {
               const active = severityFilter === key;
-              const sev    = SEV_STYLE[key];
+              const sev = SEV_STYLE[key];
               const isNewBtn = key === "NEW";
               return (
                 <button key={key} onClick={() => setSeverityFilter(key)} style={{
@@ -762,24 +697,22 @@ export default function App() {
           </div>
         )}
 
-        {/* Table */}
         {!baseLoading && (
           <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", width: "100%" }}>
-            {/* Header */}
             <div style={{
               display: "grid", gridTemplateColumns: gridCols,
               gap: 12, padding: "10px 18px",
               background: T.surface2, borderBottom: `1px solid ${T.border}`,
             }}>
               {[
-                { label: "Severity",       col: "severity" },
-                { label: "Title / Package",col: "title" },
-                { label: "CVE / ID",       col: "id" },
-                { label: "Status",         col: null },
+                { label: "Severity", col: "severity" },
+                { label: "Title / Package", col: "title" },
+                { label: "CVE / ID", col: "id" },
+                { label: "Status", col: null },
                 ...(isBase ? [{ label: "Remediation", col: null }] : []),
               ].map(({ label, col }) => {
-                const isActive  = sortCol === col && col !== null;
-                const upActive   = isActive && sortDir === "asc";
+                const isActive = sortCol === col && col !== null;
+                const upActive = isActive && sortDir === "asc";
                 const downActive = isActive && sortDir === "desc";
                 return (
                   <div key={label}
@@ -802,18 +735,17 @@ export default function App() {
               })}
             </div>
 
-            {/* Rows */}
             {paginated.length === 0 ? (
               <div style={{ padding: 48, textAlign: "center", color: T.subtext, fontSize: 13 }}>
                 No vulnerabilities match the current filter.
               </div>
             ) : paginated.map((v, i) => {
-              const key     = `${v.id}|${normalizePkg(v.pkg)}`;
-              const status  = patchStatus[key] || "open";
-              const isExp   = expandedRow === key;
+              const key = `${v.id}|${normalizePkg(v.pkg)}`;
+              const status = patchStatus[key] || "open";
+              const isExp = expandedRow === key;
               const isPatched = status === "patched";
               const isNew = isBase && uploadedVulns && !uploadedIdSet.has(key) && status !== "patched";
-              const rowBg   = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
+              const rowBg = isExp ? T.hover : (i % 2 === 0 ? T.surface : T.surface2);
 
               return (
                 <div key={`${key}-${i}`} style={{ borderBottom: `1px solid ${T.border}` }}>
@@ -882,8 +814,8 @@ export default function App() {
                       fontSize: 12, color: T.subtext,
                     }}>
                       <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginBottom: 10 }}>
-                        <div><span style={{ color: T.text, fontWeight: 600 }}>ID:</span> {v.id}</div>
-                        <div><span style={{ color: T.text, fontWeight: 600 }}>Package:</span> {v.pkg}</div>
+                        <div><span style={{ color: T.text, fontWeight: 600 }}>ID: </span>{v.id}</div>
+                        <div><span style={{ color: T.text, fontWeight: 600 }}>Package: </span>{v.pkg}</div>
                         <div>
                           <span style={{ color: T.text, fontWeight: 600 }}>Status: </span>
                           <StatusBtn status={status} onClick={(e) => cycleStatus(e, key)} />
@@ -910,7 +842,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Pagination */}
         {!baseLoading && filtered.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 16, gap: 6 }}>
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{
@@ -926,13 +857,13 @@ export default function App() {
               for (let p = 1; p <= totalPages; p++) {
                 if (p === 1 || p === totalPages || (p >= page - win && p <= page + win)) {
                   pages.push(p);
-                } else if (pages[pages.length - 1] !== "…") {
-                  pages.push("…");
+                } else if (pages[pages.length - 1] !== "...") {
+                  pages.push("...");
                 }
               }
               return pages.map((p, i) =>
-                p === "…" ? (
-                  <span key={`e-${i}`} style={{ color: T.subtext, fontSize: 13, padding: "0 4px" }}>…</span>
+                p === "..." ? (
+                  <span key={`e-${i}`} style={{ color: T.subtext, fontSize: 13, padding: "0 4px" }}>...</span>
                 ) : (
                   <button key={p} onClick={() => setPage(p)} style={{
                     background: p === page ? T.accent : T.surface2,
@@ -963,7 +894,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Scan log drawer */}
       <ScanLogDrawer log={scanLog} show={showLog} onClose={() => setShowLog(false)} T={T} />
     </div>
   );
