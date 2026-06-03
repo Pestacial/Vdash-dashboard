@@ -292,6 +292,7 @@ export default function App() {
   const [applyStatus, setApplyStatus] = useState(null);
 
   const pollTimerRef = useRef(null);
+  const aiPollRef = useRef(null);
   const fileRef = useRef();
 
   useEffect(() => {
@@ -362,7 +363,10 @@ export default function App() {
   }, [uploadedVulns]);
 
   useEffect(() => {
-    return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (aiPollRef.current) clearInterval(aiPollRef.current);
+    };
   }, []);
 
   const handleAutoscan = useCallback(async () => {
@@ -651,19 +655,66 @@ export default function App() {
               if (aiLoading) return;
               setAiLoading(true);
               setAiFixes([]);
+
+              // Stop any previous AI poll that might still be running
+              if (aiPollRef.current) clearInterval(aiPollRef.current);
+
               try {
+                // 1. Kick off the job (returns 202 immediately)
                 const res = await fetch(`${SCAN_SERVER_URL}/remediate`, {
                   method: "POST",
                   headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
                   body: JSON.stringify({})
                 });
-                const data = await res.json();
-                if (data.fixes) setAiFixes(data.fixes);
-                else alert("AI Error: " + (data.error || "Unknown"));
+
+                if (!res.ok && res.status !== 202) {
+                  const err = await res.json().catch(() => ({}));
+                  alert("AI Error: " + (err.error || `HTTP ${res.status}`));
+                  setAiLoading(false);
+                  return;
+                }
+
+                const startData = await res.json();
+                // If server was already busy just re-attach polling; either way poll for result
+                if (startData.fixes) {
+                  // Legacy sync response (shouldn't happen but handle gracefully)
+                  setAiFixes(startData.fixes);
+                  setAiLoading(false);
+                  return;
+                }
+
+                // 2. Poll /remediate/status every 2s until done
+                aiPollRef.current = setInterval(async () => {
+                  try {
+                    const statusRes = await fetch(`${SCAN_SERVER_URL}/remediate/status`);
+                    if (!statusRes.ok) return; // transient error, keep polling
+                    const statusData = await statusRes.json();
+
+                    if (!statusData.running && statusData.result !== null) {
+                      clearInterval(aiPollRef.current);
+                      aiPollRef.current = null;
+                      setAiLoading(false);
+
+                      const result = statusData.result;
+                      if (result.fixes && result.fixes.length > 0) {
+                        setAiFixes(result.fixes);
+                      } else if (result.error) {
+                        alert("AI Error: " + result.error);
+                      } else if (result.message) {
+                        alert(result.message); // e.g. "No critical/high vulnerabilities"
+                      } else {
+                        alert("AI returned no fixes.");
+                      }
+                    }
+                  } catch {
+                    // Network blip — keep polling
+                  }
+                }, 2000);
+
               } catch (e) {
                 alert("Could not reach AI server: " + e.message);
+                setAiLoading(false);
               }
-              setAiLoading(false);
             }}
             disabled={aiLoading}
             style={{
