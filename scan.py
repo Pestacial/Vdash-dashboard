@@ -350,8 +350,14 @@ def main():
     if not args.no_git:
         # 1. PULL FIRST: Sync with GitHub (Lenovo's commits) to prevent push rejections
         print("[git] git pull --rebase origin main")
-        subprocess.run(["git", "pull", "--rebase", "origin", "main"], capture_output=True, text=True)
-        
+        pull_res = subprocess.run(["git", "pull", "--rebase", "origin", "main"], capture_output=True, text=True)
+
+        # Debugging hiddden error git  HIDDEN ERROR:
+        if pull_res.returncode != 0:
+            print(f"[git] ❌ PULL FAILED: {pull_res.stderr.strip()}")
+        else:
+            print(f"[git] ✅ Pull successful: {pull_res.stdout.strip()}")
+
         # 2. PUSH: Now it's safe to push the new reports
         git_push(output_path)      # HTML
         git_push(json_path)        # JSON

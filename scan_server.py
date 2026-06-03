@@ -240,10 +240,6 @@ if __name__ == "__main__":
     app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True,
             ssl_context=(str(cert_file), str(key_file)))
 
-    app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True)
-
-# ── AI Remediation Routes ──────────────────────────────────────────────────────
-
 # ── AI Remediation Routes ──────────────────────────────────────────────────────
 
 def call_ollama(prompt: str) -> str:
