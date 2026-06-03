@@ -856,7 +856,8 @@ export default function App() {
                     
                     <div>
                       {(() => {
-                        const fix = aiFixes.find(f => f.cve === v.id && f.pkg === v.pkg);
+                        const vPkgName = v.pkg.split(' (')[0];
+                        const fix = aiFixes.find(f => f.cve === v.id && f.pkg.trim() === vPkgName);
                         if (fix) {
                           return (
                             <button 
