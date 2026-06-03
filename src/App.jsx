@@ -1038,7 +1038,7 @@ export default function App() {
                 color: applyStatus.success ? "#4ade80" : "#f87171",
                 border: `1px solid ${applyStatus.success ? "#166534" : "#7f1d1d"}`
               }}>
-                {applyStatus.success ? "✅ Fix applied successfully! Run Autoscan to verify." : "❌ Error: " + applyStatus.error}
+                {applyStatus.success ? "✅ Fix applied successfully! Run Autoscan to verify." : "❌ Error: " + (applyStatus.error || applyStatus.stderr || "Command failed")}
               </div>
             )}
 
