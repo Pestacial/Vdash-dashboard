@@ -314,6 +314,43 @@ def main():
     print(f"[scan] Output    : {output_path}")
     print(f"[scan] SSH mode  : {SCAN_ON_KALI}")
 
+    # ── GIT PULL FIRST (before writing anything) ──────────────────
+    # Stash any dirty working tree so rebase can run cleanly, then
+    # restore afterwards. This handles the case where the repo has
+    # leftover unstaged changes from a previous run or a manual edit.
+    if not args.no_git:
+        # 1. Stash (silently succeeds even if there's nothing to stash)
+        stash_res = subprocess.run(
+            ["git", "stash", "--include-untracked"],
+            capture_output=True, text=True
+        )
+        stashed = "No local changes" not in stash_res.stdout
+        if stashed:
+            print(f"[git] Stashed local changes: {stash_res.stdout.strip()}")
+
+        # 2. Pull
+        print("[git] git pull --rebase origin main")
+        pull_res = subprocess.run(
+            ["git", "pull", "--rebase", "origin", "main"],
+            capture_output=True, text=True
+        )
+        if pull_res.returncode != 0:
+            print(f"[git] ❌ PULL FAILED: {pull_res.stderr.strip()}")
+            print("[git] Continuing anyway — push may fail if remote has diverged.")
+        else:
+            print(f"[git] ✅ Pull successful: {pull_res.stdout.strip() or 'already up to date'}")
+
+        # 3. Pop the stash so the working tree is back to what it was
+        if stashed:
+            pop_res = subprocess.run(
+                ["git", "stash", "pop"],
+                capture_output=True, text=True
+            )
+            if pop_res.returncode != 0:
+                print(f"[git] ⚠️  Stash pop failed (merge conflict?): {pop_res.stderr.strip()}")
+            else:
+                print(f"[git] Stash restored.")
+
     # Run Trivy
     if SCAN_ON_KALI:
         raw = run_trivy_on_kali(args.container, severities)
@@ -346,21 +383,23 @@ def main():
     print(f"[scan] JSON report written to {json_path}")
     # ──────────────────────────────────────────────────────────────
 
-    # Git push both files
+    # Git: add both files in one commit, then push once
     if not args.no_git:
-        # 1. PULL FIRST: Sync with GitHub (Lenovo's commits) to prevent push rejections
-        print("[git] git pull --rebase origin main")
-        pull_res = subprocess.run(["git", "pull", "--rebase", "origin", "main"], capture_output=True, text=True)
-
-        # Debugging hiddden error git  HIDDEN ERROR:
-        if pull_res.returncode != 0:
-            print(f"[git] ❌ PULL FAILED: {pull_res.stderr.strip()}")
-        else:
-            print(f"[git] ✅ Pull successful: {pull_res.stdout.strip()}")
-
-        # 2. PUSH: Now it's safe to push the new reports
-        git_push(output_path)      # HTML
-        git_push(json_path)        # JSON
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        cmds = [
+            ["git", "add", str(output_path), str(json_path)],
+            ["git", "commit", "-m", f"chore: update vulnerability report ({timestamp})"],
+            ["git", "push"],
+        ]
+        for cmd in cmds:
+            print(f"[git] {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                msg = result.stdout + result.stderr
+                if "nothing to commit" in msg:
+                    print("[git] Nothing new to commit.")
+                    break
+                print(f"[git] WARN: {result.stderr.strip()}", file=sys.stderr)
         print("[scan] Done. Vercel will deploy the updated report automatically.")
     else:
         print("[scan] Done. Skipped git push (--no-git).")
