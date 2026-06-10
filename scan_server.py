@@ -245,6 +245,11 @@ def _extract_fixes(raw: str) -> list:
         # If the dict itself looks like one fix entry, wrap it
         if "cve" in parsed and "command" in parsed:
             return [parsed]
+        # Handle numbered-key dicts: {"1": {...}, "2": {...}} or {"item1": {...}}
+        # qwen sometimes returns this instead of a proper array
+        candidates = [v for v in parsed.values() if isinstance(v, dict) and "cve" in v]
+        if candidates:
+            return candidates
         # Last resort: return the first list value found
         for v in parsed.values():
             if isinstance(v, list):
@@ -255,26 +260,31 @@ def _extract_fixes(raw: str) -> list:
 
 def _build_prompt(container: str, vulns: list) -> str:
     """Build the Ollama prompt for a batch of vulnerabilities."""
+    count = len(vulns)
     vuln_lines = "\n".join(
-        f'- CVE: {v["cve"]}, Package: {v["pkg"]}, InstalledVersion: {v["version"]}'
-        for v in vulns
+        f'{i+1}. CVE: {v["cve"]}, Package: {v["pkg"]}, InstalledVersion: {v["version"]}'
+        for i, v in enumerate(vulns)
     )
+    # Two concrete examples make qwen far more likely to return a full array
+    # rather than collapsing the whole batch into a single object.
     return f"""You are a Linux sysadmin fixing vulnerabilities in a Debian-based Docker container.
+Container: {container}
 
-Container name: {container}
+TASK: produce exactly {count} fix entries — one per numbered item below.
 
-All packages listed below are real Debian/Ubuntu system packages that CAN be upgraded with apt-get. For each one, produce a fix entry.
+OUTPUT RULES (follow exactly):
+- Respond with a JSON ARRAY only. No prose, no markdown, no code fences.
+- The array must contain EXACTLY {count} objects, one for each item.
+- Each object must have exactly these 4 string fields: "cve", "pkg", "explanation", "command"
+- "command" must be: docker exec {container} apt-get install --only-upgrade -y <pkg>
 
-Return ONLY a JSON array with no other text, no markdown, no code fences. Each element must have exactly these 4 fields:
-"cve", "pkg", "explanation", "command"
+EXAMPLE (2 items → 2-element array):
+[
+  {{"cve": "CVE-2024-00001", "pkg": "openssl", "explanation": "Fixes an OpenSSL buffer overflow.", "command": "docker exec {container} apt-get install --only-upgrade -y openssl"}},
+  {{"cve": "CVE-2024-00002", "pkg": "curl", "explanation": "Fixes a curl out-of-bounds read.", "command": "docker exec {container} apt-get install --only-upgrade -y curl"}}
+]
 
-The "command" must be exactly:
-docker exec {container} apt-get install --only-upgrade -y <pkg>
-
-Example:
-[{{"cve": "CVE-2025-68973", "pkg": "gnupg", "explanation": "Upgrades GnuPG to fix a signature verification vulnerability.", "command": "docker exec {container} apt-get install --only-upgrade -y gnupg"}}]
-
-Packages to fix:
+VULNERABILITIES TO FIX ({count} items — your array must have {count} elements):
 {vuln_lines}"""
 
 
