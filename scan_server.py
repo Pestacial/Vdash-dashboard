@@ -40,6 +40,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -65,20 +66,34 @@ LISTEN_PORT = 5000
 
 # Your Vercel dashboard URL (for CORS).
 # Update this if your Vercel project URL changes.
-ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN","https://vuln-dashboard.vercel.app")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "https://vuln-dashboard.vercel.app")
 
 # How long (seconds) to keep scan log output before clearing it.
 LOG_TTL = 300
+
+# AI remediation batch size — how many CVEs to send to Ollama per request.
+# Keeping this at 10 gives qwen2.5:7b enough room to return clean JSON
+# without truncating or garbling the output. The worker loops until all
+# vulnerabilities are processed.
+REMEDIATION_BATCH_SIZE = 10
 
 # ── State ──────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
 
-_lock        = threading.Lock()
-_scan_running = False
-_scan_log     = []        # list of strings, lines of stdout/stderr
-_last_scan_dt = None      # datetime of last completed scan
-_last_scan_ok = None      # True/False
+_lock         = threading.Lock()
+
+# Scan state
+_scan_running  = False
+_scan_log      = []       # list of strings, lines of stdout/stderr
+_last_scan_dt  = None     # datetime of last completed scan
+_last_scan_ok  = None     # True/False
+
+# Remediation state
+_remediate_running  = False
+_remediate_result   = None   # dict: {"fixes": [...]} or {"error": "..."}
+_remediate_started  = None   # datetime
+_remediate_progress = None   # dict: {"batch": N, "total_batches": N, "fixes_so_far": N}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -118,6 +133,8 @@ def _check_token():
     import hmac
     return hmac.compare_digest(token.encode(), SCAN_TOKEN.encode())
 
+
+# ── Scan background worker ─────────────────────────────────────────────────────
 
 def _run_scan_background(container: str, severity: str):
     """Run scan.py in a background thread, capture output."""
@@ -164,6 +181,190 @@ def _run_scan_background(container: str, severity: str):
             _scan_running = False
 
 
+# ── AI Remediation helpers ─────────────────────────────────────────────────────
+
+def call_ollama(prompt: str, retries: int = 2) -> str:
+    """
+    Send a prompt to local Ollama and return the raw response string.
+    Retries up to `retries` times on network/timeout errors.
+    """
+    data = json.dumps({
+        "model":  "qwen2.5:7b",
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "http://localhost:11434/api/generate",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                return json.loads(resp.read().decode("utf-8"))["response"]
+        except Exception as e:
+            last_err = e
+            if attempt < retries:
+                print(f"[ai] Ollama call failed (attempt {attempt + 1}), retrying: {e}", flush=True)
+                time.sleep(3)
+
+    return json.dumps({"error": str(last_err)})
+
+
+def _extract_fixes(raw: str) -> list:
+    """
+    Robustly extract the fixes list from whatever qwen returns.
+    Handles: bare array, {"fixes":[...]}, {"remediation":[...]},
+    {"result":[...]}, single object, and JSON embedded in prose.
+    """
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        # Try to find a JSON array or object anywhere in the string
+        m = re.search(r"(\[.*\]|\{.*\})", raw, re.DOTALL)
+        if not m:
+            return []
+        try:
+            parsed = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            return []
+
+    # Already a list
+    if isinstance(parsed, list):
+        return parsed
+
+    # Dict — hunt for a list value under any common key
+    if isinstance(parsed, dict):
+        for key in ("fixes", "remediation", "results", "result", "items", "vulnerabilities"):
+            if isinstance(parsed.get(key), list):
+                return parsed[key]
+        # If the dict itself looks like one fix entry, wrap it
+        if "cve" in parsed and "command" in parsed:
+            return [parsed]
+        # Last resort: return the first list value found
+        for v in parsed.values():
+            if isinstance(v, list):
+                return v
+
+    return []
+
+
+def _build_prompt(container: str, vulns: list) -> str:
+    """Build the Ollama prompt for a batch of vulnerabilities."""
+    vuln_lines = "\n".join(
+        f'- CVE: {v["cve"]}, Package: {v["pkg"]}, InstalledVersion: {v["version"]}'
+        for v in vulns
+    )
+    return f"""You are a Linux sysadmin fixing vulnerabilities in a Debian-based Docker container.
+
+Container name: {container}
+
+All packages listed below are real Debian/Ubuntu system packages that CAN be upgraded with apt-get. For each one, produce a fix entry.
+
+Return ONLY a JSON array with no other text, no markdown, no code fences. Each element must have exactly these 4 fields:
+"cve", "pkg", "explanation", "command"
+
+The "command" must be exactly:
+docker exec {container} apt-get install --only-upgrade -y <pkg>
+
+Example:
+[{{"cve": "CVE-2025-68973", "pkg": "gnupg", "explanation": "Upgrades GnuPG to fix a signature verification vulnerability.", "command": "docker exec {container} apt-get install --only-upgrade -y gnupg"}}]
+
+Packages to fix:
+{vuln_lines}"""
+
+
+def _run_remediate_background(vulns_for_ai: list, container: str):
+    """
+    Process vulnerabilities in batches through Ollama.
+    Each batch is REMEDIATION_BATCH_SIZE items. Results accumulate across
+    batches so no fixes are lost if a later batch fails.
+    """
+    global _remediate_running, _remediate_result, _remediate_progress
+
+    # ── Deduplicate by CVE + base package name ──────────────────────
+    seen = set()
+    deduped = []
+    for v in vulns_for_ai:
+        # e.g. treat gnupg/gpg/gpgv as same family by splitting on "/"
+        key = f"{v['cve']}|{v['pkg'].split('/')[0]}"
+        if key not in seen:
+            seen.add(key)
+            deduped.append(v)
+
+    print(f"[ai] Deduped vulnerabilities: {len(deduped)} (from {len(vulns_for_ai)})", flush=True)
+
+    # ── Split into batches ───────────────────────────────────────────
+    batches = [
+        deduped[i : i + REMEDIATION_BATCH_SIZE]
+        for i in range(0, len(deduped), REMEDIATION_BATCH_SIZE)
+    ]
+    total_batches = len(batches)
+    print(f"[ai] Processing {total_batches} batches of up to {REMEDIATION_BATCH_SIZE} vulns each.", flush=True)
+
+    all_valid_fixes = []
+    errors = []
+
+    for batch_idx, batch in enumerate(batches, start=1):
+        print(f"[ai] Batch {batch_idx}/{total_batches} — {len(batch)} CVEs", flush=True)
+
+        # Update progress so the frontend can show meaningful status
+        with _lock:
+            _remediate_progress = {
+                "batch":        batch_idx,
+                "total_batches": total_batches,
+                "fixes_so_far": len(all_valid_fixes),
+            }
+
+        prompt = _build_prompt(container, batch)
+        ai_response = call_ollama(prompt)
+        print(f"[ai] Batch {batch_idx} raw response (first 400 chars):\n{ai_response[:400]}", flush=True)
+
+        fixes = _extract_fixes(ai_response)
+        print(f"[ai] Batch {batch_idx}: extracted {len(fixes)} fix(es).", flush=True)
+
+        # Validate: must have cve, command, and the correct container name
+        valid = [
+            f for f in fixes
+            if isinstance(f, dict)
+            and f.get("cve")
+            and f.get("command")
+            and container in f.get("command", "")
+        ]
+        print(f"[ai] Batch {batch_idx}: {len(valid)} fix(es) passed validation.", flush=True)
+
+        if valid:
+            all_valid_fixes.extend(valid)
+        else:
+            errors.append({
+                "batch": batch_idx,
+                "reason": "AI returned no valid fix commands for this batch.",
+                "raw_preview": ai_response[:400],
+            })
+
+    # ── Finalise ─────────────────────────────────────────────────────
+    print(f"[ai] Finished. Total valid fixes: {len(all_valid_fixes)}", flush=True)
+
+    result: dict = {"fixes": all_valid_fixes}
+    if errors:
+        result["batch_errors"] = errors
+    if not all_valid_fixes:
+        result["error"] = "AI did not return any valid fix commands across all batches."
+
+    with _lock:
+        _remediate_result   = result
+        _remediate_progress = {
+            "batch":         total_batches,
+            "total_batches": total_batches,
+            "fixes_so_far":  len(all_valid_fixes),
+        }
+        _remediate_running = False
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.after_request
@@ -200,11 +401,11 @@ def trigger_scan():
     with _lock:
         if _scan_running:
             return jsonify({
-                "status": "busy",
+                "status":  "busy",
                 "message": "A scan is already in progress. Please wait.",
             }), 409
 
-        body = request.get_json(silent=True) or {}
+        body      = request.get_json(silent=True) or {}
         container = body.get("container", "sandbox-opensilex-docker-opensilexapp")
         severity  = body.get("severity",  "CRITICAL,HIGH,MEDIUM,LOW")
 
@@ -226,10 +427,10 @@ def trigger_scan():
 def scan_status():
     """Poll scan status and log. No auth required."""
     return jsonify({
-        "running":     _scan_running,
-        "lastScanAt":  _last_scan_dt.isoformat() if _last_scan_dt else None,
-        "lastScanOk":  _last_scan_ok,
-        "log":         _scan_log[-50:],   # last 50 lines
+        "running":    _scan_running,
+        "lastScanAt": _last_scan_dt.isoformat() if _last_scan_dt else None,
+        "lastScanOk": _last_scan_ok,
+        "log":        _scan_log[-50:],   # last 50 lines
     })
 
 
@@ -239,185 +440,24 @@ def health():
     return jsonify({"ok": True, "server": "vulndash-scan-server"})
 
 
-# ── AI Remediation state ───────────────────────────────────────────────────────
-
-_remediate_running = False
-_remediate_result  = None   # dict: {"fixes": [...]} or {"error": "..."}
-_remediate_started = None   # datetime
-
-
-# ── AI Remediation Routes ──────────────────────────────────────────────────────
-# NOTE: These MUST be defined before app.run() — Flask registers routes at
-# decoration time, so anything after app.run() is never reached.
-
-def call_ollama(prompt: str) -> str:
-    """Send a prompt to local Ollama and get a JSON response."""
-    data = json.dumps({
-        "model": "qwen2.5:7b",
-        "prompt": prompt,
-        "stream": False,
-        "format": "json"
-    }).encode('utf-8')
-
-    req = urllib.request.Request(
-        "http://localhost:11434/api/generate",
-        data=data,
-        headers={"Content-Type": "application/json"}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            return json.loads(resp.read().decode('utf-8'))['response']
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-def _extract_fixes(raw: str) -> list:
-    """
-    Robustly extract the fixes list from whatever qwen returns.
-    Handles: bare array, {"fixes":[...]}, {"remediation":[...]},
-    {"result":[...]}, single object, and JSON embedded in prose.
-    """
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        # Try to find a JSON array or object anywhere in the string
-        import re
-        m = re.search(r'(\[.*\]|\{.*\})', raw, re.DOTALL)
-        if not m:
-            return []
-        try:
-            parsed = json.loads(m.group(1))
-        except json.JSONDecodeError:
-            return []
-
-    # Already a list
-    if isinstance(parsed, list):
-        return parsed
-
-    # Dict — hunt for a list value under any common key
-    if isinstance(parsed, dict):
-        for key in ("fixes", "remediation", "results", "result", "items", "vulnerabilities"):
-            if isinstance(parsed.get(key), list):
-                return parsed[key]
-        # If every value is itself a dict with "cve"/"command", the dict IS one fix
-        if "cve" in parsed and "command" in parsed:
-            return [parsed]
-        # Last resort: return the first list value found
-        for v in parsed.values():
-            if isinstance(v, list):
-                return v
-
-    return []
-
-
-def _run_remediate_background(vulns_for_ai: list):
-    """Run Ollama in a background thread so the POST returns immediately."""
-    global _remediate_running, _remediate_result
-
-    print(f"[ai] Starting analysis of {len(vulns_for_ai)} vulnerabilities.", flush=True)
-
-    # ── Pre-filter: separate Java/Maven packages from real Debian packages ──────
-    # Java packages always contain ":" (groupId:artifactId) or known Java names.
-    # We do this on the server so the AI only has to write commands, not classify.
-    JAVA_INDICATORS = (":", "jackson", "netty", "tomcat", "log4j", "spring",
-                       "hibernate", "tika", "nimbus", "commons-", "io.netty",
-                       "org.apache", "com.fasterxml", "com.nimbusds")
-
-    system_pkgs = []
-    skipped_java = []
-    for v in vulns_for_ai:
-        pkg = v.get("pkg", "")
-        if any(pkg.lower().startswith(ind) or ind in pkg.lower() for ind in JAVA_INDICATORS):
-            skipped_java.append(pkg)
-        else:
-            system_pkgs.append(v)
-
-    print(f"[ai] System packages: {len(system_pkgs)}, Java (skipped): {len(skipped_java)}", flush=True)
-    if skipped_java:
-        print(f"[ai] Skipped Java: {', '.join(set(skipped_java))[:200]}", flush=True)
-
-    if not system_pkgs:
-        _remediate_result = {
-            "fixes": [],
-            "message": f"All {len(vulns_for_ai)} vulnerabilities are in Java libraries "
-                       f"(tomcat, netty, jackson, etc.) which cannot be patched with apt-get. "
-                       f"These require updating the application's bundled dependencies.",
-        }
-        _remediate_running = False
-        return
-
-    # Deduplicate by CVE+pkg so the same gnupg CVE isn't repeated 8 times
-    seen = set()
-    deduped = []
-    for v in system_pkgs:
-        key = f"{v['cve']}|{v['pkg'].split('/')[0]}"  # treat gnupg/gpg/gpgv as same family
-        if key not in seen:
-            seen.add(key)
-            deduped.append(v)
-
-    print(f"[ai] Deduped system packages to send: {len(deduped)}", flush=True)
-
-    vuln_lines = "\n".join(
-        f'- CVE: {v["cve"]}, Package: {v["pkg"]}, InstalledVersion: {v["version"]}'
-        for v in deduped
-    )
-
-    prompt = f"""You are a Linux sysadmin fixing vulnerabilities in a Debian-based Docker container.
-
-Container name: sandbox-opensilex-docker-opensilexapp
-
-All packages listed below are real Debian/Ubuntu system packages that CAN be upgraded with apt-get. For each one, produce a fix entry.
-
-Return ONLY a JSON array with no other text. Each element must have exactly these 4 fields:
-"cve", "pkg", "explanation", "command"
-
-The "command" must be exactly:
-docker exec sandbox-opensilex-docker-opensilexapp apt-get install --only-upgrade -y <pkg>
-
-Example:
-[{{"cve": "CVE-2025-68973", "pkg": "gnupg", "explanation": "Upgrades GnuPG to fix a signature verification vulnerability.", "command": "docker exec sandbox-opensilex-docker-opensilexapp apt-get install --only-upgrade -y gnupg"}}]
-
-Packages to fix:
-{vuln_lines}"""
-
-    ai_response = call_ollama(prompt)
-    print(f"[ai] Raw Ollama response (first 800 chars):\n{ai_response[:800]}", flush=True)
-
-    fixes = _extract_fixes(ai_response)
-    print(f"[ai] Extracted {len(fixes)} fixes from response.", flush=True)
-
-    # Validate: must have cve, command, and correct container name
-    valid_fixes = [
-        f for f in fixes
-        if isinstance(f, dict)
-        and f.get("cve")
-        and f.get("command")
-        and "sandbox-opensilex-docker-opensilexapp" in f.get("command", "")
-    ]
-    print(f"[ai] {len(valid_fixes)} fixes passed validation.", flush=True)
-
-    if valid_fixes:
-        _remediate_result = {"fixes": valid_fixes}
-    else:
-        _remediate_result = {
-            "fixes": [],
-            "error": "AI did not return valid fix commands.",
-            "raw": ai_response[:800],
-        }
-
-    _remediate_running = False
-
-
 @app.route("/remediate", methods=["POST"])
 def remediate():
-    global _remediate_running, _remediate_result, _remediate_started
+    """
+    Kick off an AI remediation job.
+    Reads base-report.json, extracts CVEs, and processes them in batches
+    via Ollama. Client should poll /remediate/status for progress/results.
+    """
+    global _remediate_running, _remediate_result, _remediate_started, _remediate_progress
+
     if not _check_token():
         return jsonify({"error": "Unauthorized"}), 401
 
-    # If a job is running, tell the client to keep polling /remediate/status
     with _lock:
         if _remediate_running:
-            return jsonify({"status": "busy", "message": "AI analysis already in progress."}), 202
+            return jsonify({
+                "status":  "busy",
+                "message": "AI analysis already in progress.",
+            }), 202
 
     json_path = Path(__file__).parent / "public" / "base-report.json"
     if not json_path.exists():
@@ -428,40 +468,41 @@ def remediate():
     except Exception as e:
         return jsonify({"error": f"Failed to read JSON: {e}"}), 500
 
-    # scan.py wraps Trivy output as {"scanDate":..., "results": <trivy JSON>}
+    # scan.py wraps Trivy output as {"scanDate":..., "container":..., "results": <trivy JSON>}
+    container    = data.get("container", "sandbox-opensilex-docker-opensilexapp")
     trivy_results = data.get("results", data)
 
     vulns_for_ai = []
     for res in trivy_results.get("Results", []):
         for v in res.get("Vulnerabilities", []):
-            if v.get("Severity") in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+            if v.get("Severity") in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
                 vulns_for_ai.append({
-                    "cve": v.get("VulnerabilityID"),
-                    "pkg": v.get("PkgName"),
-                    "version": v.get("InstalledVersion")
+                    "cve":     v.get("VulnerabilityID"),
+                    "pkg":     v.get("PkgName"),
+                    "version": v.get("InstalledVersion"),
                 })
 
-    vulns_for_ai = vulns_for_ai[:50]  # Limit to 30 to prevent timeouts
-
     if not vulns_for_ai:
-        return jsonify({"fixes": [], "message": "No critical/high vulnerabilities to analyze."})
+        return jsonify({"fixes": [], "message": "No vulnerabilities to analyse."})
+
+    print(f"[ai] Queued {len(vulns_for_ai)} vulnerabilities for AI remediation.", flush=True)
 
     with _lock:
-        _remediate_running = True
-        _remediate_result  = None
-        _remediate_started = datetime.now(timezone.utc)
+        _remediate_running  = True
+        _remediate_result   = None
+        _remediate_started  = datetime.now(timezone.utc)
+        _remediate_progress = {"batch": 0, "total_batches": None, "fixes_so_far": 0}
 
     thread = threading.Thread(
         target=_run_remediate_background,
-        args=(vulns_for_ai,),
+        args=(vulns_for_ai, container),
         daemon=True,
     )
     thread.start()
 
-    # Return 202 immediately — client should poll /remediate/status
     return jsonify({
-        "status": "started",
-        "message": f"AI is analysing {len(vulns_for_ai)} vulnerabilities. Poll /remediate/status for results.",
+        "status":  "started",
+        "message": f"AI is analysing {len(vulns_for_ai)} vulnerabilities in batches of {REMEDIATION_BATCH_SIZE}. Poll /remediate/status for results.",
     }), 202
 
 
@@ -471,20 +512,26 @@ def remediate_status():
     return jsonify({
         "running":   _remediate_running,
         "startedAt": _remediate_started.isoformat() if _remediate_started else None,
+        "progress":  _remediate_progress,
         "result":    _remediate_result,
     })
 
 
 @app.route("/apply-fix", methods=["POST"])
 def apply_fix():
+    """
+    Execute a single apt-get upgrade inside the container.
+    Only commands that start with the exact docker exec prefix are accepted.
+    """
     if not _check_token():
         return jsonify({"error": "Unauthorized"}), 401
 
     body = request.get_json(silent=True) or {}
-    cmd = body.get("command", "")
+    cmd  = body.get("command", "")
 
-    # Security check: Only allow apt-get upgrades inside the specific container
-    if not cmd.startswith("docker exec sandbox-opensilex-docker-opensilexapp apt-get"):
+    # Security check: only allow apt-get upgrades inside the specific container
+    allowed_prefix = "docker exec sandbox-opensilex-docker-opensilexapp apt-get"
+    if not cmd.startswith(allowed_prefix):
         return jsonify({"error": "Command rejected by security policy."}), 403
 
     try:
@@ -493,8 +540,8 @@ def apply_fix():
         )
         return jsonify({
             "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr
+            "stdout":  result.stdout,
+            "stderr":  result.stderr,
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
@@ -508,15 +555,21 @@ if __name__ == "__main__":
         print("  export SCAN_TOKEN=\"$(python3 -c 'import secrets; print(secrets.token_hex(32))')\"\n")
 
     print(f"[server] vulndash scan server starting on {LISTEN_HOST}:{LISTEN_PORT}")
-    print(f"[server] Scan script: {SCAN_SCRIPT}")
-    print(f"[server] CORS origin: {ALLOWED_ORIGIN}")
-    print(f"[server] Token set  : {'YES (custom)' if SCAN_TOKEN != 'CHANGE_ME_USE_A_REAL_SECRET' else 'NO — SET IT!'}\n")
+    print(f"[server] Scan script   : {SCAN_SCRIPT}")
+    print(f"[server] CORS origin   : {ALLOWED_ORIGIN}")
+    print(f"[server] Batch size    : {REMEDIATION_BATCH_SIZE}")
+    print(f"[server] Token set     : {'YES (custom)' if SCAN_TOKEN != 'CHANGE_ME_USE_A_REAL_SECRET' else 'NO — SET IT!'}\n")
 
-    # HTTPS for Tailscale-only access
     cert_file = Path(__file__).parent / "100.95.217.28.pem"
     key_file  = Path(__file__).parent / "100.95.217.28-key.pem"
-    app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=False, threaded=True,
-            ssl_context=(str(cert_file), str(key_file)))
+    app.run(
+        host=LISTEN_HOST,
+        port=LISTEN_PORT,
+        debug=False,
+        threaded=True,
+        ssl_context=(str(cert_file), str(key_file)),
+    )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SYSTEMD SERVICE SETUP
