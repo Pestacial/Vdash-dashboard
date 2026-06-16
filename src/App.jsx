@@ -288,8 +288,11 @@ export default function App() {
   // AI Remediation State
   const [aiFixes, setAiFixes] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [consentModal, setConsentModal] = useState(null);
+  const [consentModal, setConsentModal] = useState(null);   // single-fix modal
   const [applyStatus, setApplyStatus] = useState(null);
+  const [applyingFix, setApplyingFix] = useState(false);   // true while fetch is in flight
+  const [bulkConsentModal, setBulkConsentModal] = useState(false); // "fix all" modal
+  const [bulkProgress, setBulkProgress] = useState(null);  // { done, total, errors[] }
 
   const pollTimerRef = useRef(null);
   const aiPollRef = useRef(null);
@@ -411,6 +414,43 @@ export default function App() {
   }, [scanState, startPolling]);
 
   const vulns = activeView === "base" ? baseVulns : (uploadedVulns || []);
+
+  // Deduplicate fixes by command so "Fix All" doesn't run the same apt command twice
+  const uniqueAiFixes = useMemo(() => {
+    const seen = new Set();
+    return aiFixes.filter(f => {
+      if (seen.has(f.command)) return false;
+      seen.add(f.command);
+      return true;
+    });
+  }, [aiFixes]);
+
+  const handleBulkApply = async () => {
+    if (uniqueAiFixes.length === 0) return;
+    setBulkProgress({ done: 0, total: uniqueAiFixes.length, errors: [] });
+    for (let i = 0; i < uniqueAiFixes.length; i++) {
+      const fix = uniqueAiFixes[i];
+      try {
+        const res = await fetch(`${SCAN_SERVER_URL}/apply-fix`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ command: fix.command }),
+        });
+        const data = await res.json();
+        setBulkProgress(prev => ({
+          done: i + 1,
+          total: prev.total,
+          errors: data.success ? prev.errors : [...prev.errors, `${fix.pkg}: ${data.stderr || data.error || "failed"}`],
+        }));
+      } catch (e) {
+        setBulkProgress(prev => ({
+          done: i + 1,
+          total: prev.total,
+          errors: [...prev.errors, `${fix.pkg}: ${e.message}`],
+        }));
+      }
+    }
+  };
 
   useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
 
@@ -551,7 +591,7 @@ export default function App() {
     : "90px 60px minmax(0, 1fr) 180px 100px";
 
   return (
-    <div style={{ minHeight: "100vh", width: "100%", overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", width: "100%", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       
       <div style={{
@@ -727,6 +767,25 @@ export default function App() {
             {aiLoading ? "🧠 Thinking..." : "🤖 Remediate with AI"}
           </button>
 
+          {aiFixes.length > 0 && (
+            <button
+              onClick={() => { setBulkConsentModal(true); setBulkProgress(null); }}
+              title={`Apply all ${uniqueAiFixes.length} AI-generated fixes in one go`}
+              style={{
+                background: "#6d28d920", border: "1px solid #8b5cf6", color: "#a78bfa",
+                padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+                fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+                whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              🤖 Fix All <span style={{
+                background: "#8b5cf6", color: "#fff",
+                fontSize: 10, fontWeight: 800, borderRadius: 10,
+                padding: "1px 7px", fontFamily: "'DM Mono', monospace",
+              }}>{uniqueAiFixes.length}</span>
+            </button>
+          )}
+
           {(scanLog.length > 0 || scanState !== SCAN_STATE.IDLE) && (
             <button onClick={() => setShowLog((s) => !s)} style={{
               background: showLog ? "#0ea5e920" : T.surface2,
@@ -740,7 +799,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ padding: "16px 12px", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ padding: "16px 12px", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
         {baseLoading && activeView === "base" && (
           <div style={{ color: T.subtext, fontSize: 13, padding: 40, textAlign: "center" }}>
             Loading base report…
@@ -861,7 +920,7 @@ export default function App() {
                         if (fix) {
                           return (
                             <button 
-                              onClick={(e) => { e.stopPropagation(); setConsentModal(fix); setApplyStatus(null); }}
+                              onClick={(e) => { e.stopPropagation(); setConsentModal(fix); setApplyStatus(null); setApplyingFix(false); }}
                               title="Click to review AI fix"
                               style={{
                                 background: "#8b5cf620", border: "1px solid #8b5cf6", color: "#8b5cf6",
@@ -1018,53 +1077,193 @@ export default function App() {
             <div style={{ background: T.surface2, padding: 12, borderRadius: 6, marginBottom: 16, border: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 11, color: T.subtext, marginBottom: 4, fontWeight: 700 }}>CVE:</div>
               <div style={{ fontSize: 14, color: T.text, fontFamily: "'DM Mono', monospace" }}>{consentModal.cve} ({consentModal.pkg})</div>
-              
+
               <div style={{ fontSize: 11, color: T.subtext, marginTop: 12, marginBottom: 4, fontWeight: 700 }}>AI Explanation:</div>
               <div style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}>{consentModal.explanation}</div>
-              
+
               <div style={{ fontSize: 11, color: T.subtext, marginTop: 12, marginBottom: 4, fontWeight: 700 }}>Command to Execute:</div>
-              <code style={{ 
-                display: "block", background: "#000", color: "#4ade80", padding: 10, borderRadius: 4, 
-                fontSize: 12, fontFamily: "'DM Mono', monospace", wordBreak: "break-all" 
+              <code style={{
+                display: "block", background: "#000", color: "#4ade80", padding: 10, borderRadius: 4,
+                fontSize: 12, fontFamily: "'DM Mono', monospace", wordBreak: "break-all"
               }}>
                 {consentModal.command}
               </code>
             </div>
 
             {applyStatus && (
-              <div style={{ 
+              <div style={{
                 padding: 10, borderRadius: 6, marginBottom: 16, fontSize: 12, fontFamily: "'DM Mono', monospace",
                 background: applyStatus.success ? "#052e16" : "#3f0f0f",
                 color: applyStatus.success ? "#4ade80" : "#f87171",
                 border: `1px solid ${applyStatus.success ? "#166534" : "#7f1d1d"}`
               }}>
-                {applyStatus.success ? "✅ Fix applied successfully! Run Autoscan to verify." : "❌ Error: " + (applyStatus.error || applyStatus.stderr || "Command failed")}
+                {applyStatus.success
+                  ? "✅ Fix applied successfully! Run Autoscan to verify."
+                  : "❌ Error: " + (applyStatus.error || applyStatus.stderr || "Command failed")}
               </div>
             )}
 
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-              <button onClick={() => setConsentModal(null)} style={{
-                background: "transparent", border: `1px solid ${T.border}`, color: T.subtext,
-                padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 600
-              }}>Cancel</button>
-              <button onClick={async () => {
-                setApplyStatus(null);
-                try {
-                  const res = await fetch(`${SCAN_SERVER_URL}/apply-fix`, {
-                    method: "POST",
-                    headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({ command: consentModal.command })
-                  });
-                  const data = await res.json();
-                  setApplyStatus(data);
-                } catch (e) {
-                  setApplyStatus({ success: false, error: e.message });
-                }
-              }} style={{
-                background: "#8b5cf6", border: "none", color: "#fff",
-                padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 700,
-                boxShadow: "0 0 10px #8b5cf655"
-              }}>✅ Consent & Execute</button>
+              {/* Once fix is done the left button closes; when still pending it cancels */}
+              {applyStatus?.success ? (
+                <button onClick={() => { setConsentModal(null); setApplyStatus(null); setApplyingFix(false); }} style={{
+                  background: "#10b981", border: "none", color: "#fff",
+                  padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 700,
+                  boxShadow: "0 0 10px #10b98155",
+                }}>Dismiss ✕</button>
+              ) : (
+                <>
+                  <button onClick={() => { setConsentModal(null); setApplyStatus(null); setApplyingFix(false); }} style={{
+                    background: "transparent", border: `1px solid ${T.border}`, color: T.subtext,
+                    padding: "8px 20px", borderRadius: 6, cursor: "pointer", fontWeight: 600,
+                  }}>Cancel</button>
+                  <button
+                    disabled={applyingFix}
+                    onClick={async () => {
+                      setApplyStatus(null);
+                      setApplyingFix(true);
+                      try {
+                        const res = await fetch(`${SCAN_SERVER_URL}/apply-fix`, {
+                          method: "POST",
+                          headers: { "Authorization": `Bearer ${SCAN_TOKEN}`, "Content-Type": "application/json" },
+                          body: JSON.stringify({ command: consentModal.command }),
+                        });
+                        const data = await res.json();
+                        setApplyStatus(data);
+                      } catch (e) {
+                        setApplyStatus({ success: false, error: e.message });
+                      } finally {
+                        setApplyingFix(false);
+                      }
+                    }}
+                    style={{
+                      background: applyingFix ? "#6b7280" : "#8b5cf6", border: "none", color: "#fff",
+                      padding: "8px 20px", borderRadius: 6,
+                      cursor: applyingFix ? "not-allowed" : "pointer",
+                      fontWeight: 700, boxShadow: "0 0 10px #8b5cf655",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    {applyingFix && <PulseDot color="#fff" />}
+                    {applyingFix ? "Applying…" : "✅ Consent & Execute"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk "Fix All" consent modal ─────────────────────────────────── */}
+      {bulkConsentModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1001,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+          <div style={{
+            background: T.surface, border: "2px solid #8b5cf6", borderRadius: 12,
+            padding: 24, maxWidth: 640, width: "100%", boxShadow: "0 0 40px #8b5cf688",
+          }}>
+            <h3 style={{ margin: "0 0 4px 0", color: "#8b5cf6", fontSize: 18 }}>🤖 Fix All — Bulk Remediation</h3>
+            <p style={{ margin: "0 0 16px 0", fontSize: 13, color: T.subtext, lineHeight: 1.5 }}>
+              This will run <strong style={{ color: T.text }}>{uniqueAiFixes.length} upgrade command{uniqueAiFixes.length !== 1 ? "s" : ""}</strong> inside the container in sequence.
+              Each command refreshes the package index before installing, so no version pinning errors.
+            </p>
+
+            {/* Package list */}
+            <div style={{
+              background: T.surface2, border: `1px solid ${T.border}`,
+              borderRadius: 8, padding: 12, marginBottom: 16,
+              maxHeight: 220, overflowY: "auto",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.subtext, letterSpacing: 1.5, marginBottom: 8, fontFamily: "'DM Mono', monospace" }}>
+                PACKAGES TO UPGRADE
+              </div>
+              {uniqueAiFixes.map((fix, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "6px 0", borderTop: i > 0 ? `1px solid ${T.border}` : "none",
+                }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, background: "#8b5cf620", color: "#a78bfa",
+                    border: "1px solid #8b5cf655", borderRadius: 3,
+                    padding: "2px 6px", fontFamily: "'DM Mono', monospace",
+                    marginTop: 1, flexShrink: 0,
+                  }}>PKG</span>
+                  <div>
+                    <div style={{ fontSize: 12, color: T.text, fontFamily: "'DM Mono', monospace" }}>{fix.pkg}</div>
+                    <div style={{ fontSize: 11, color: T.subtext, marginTop: 2 }}>{fix.explanation}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Progress / result */}
+            {bulkProgress && (
+              <div style={{ marginBottom: 16 }}>
+                {/* Progress bar */}
+                <div style={{ background: T.surface2, borderRadius: 6, height: 6, marginBottom: 8, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 6, transition: "width 0.4s ease",
+                    width: `${Math.round((bulkProgress.done / bulkProgress.total) * 100)}%`,
+                    background: bulkProgress.errors.length > 0 ? "#f97316" : "#8b5cf6",
+                  }} />
+                </div>
+                <div style={{ fontSize: 11, color: T.subtext, fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>
+                  {bulkProgress.done < bulkProgress.total
+                    ? `Applying fix ${bulkProgress.done + 1} of ${bulkProgress.total}…`
+                    : bulkProgress.errors.length === 0
+                      ? `✅ All ${bulkProgress.total} fixes applied. Run Autoscan to verify.`
+                      : `⚠ Done — ${bulkProgress.total - bulkProgress.errors.length} succeeded, ${bulkProgress.errors.length} failed.`}
+                </div>
+                {bulkProgress.errors.length > 0 && (
+                  <div style={{
+                    background: "#3f0f0f", border: "1px solid #7f1d1d",
+                    borderRadius: 6, padding: "8px 10px", fontSize: 11,
+                    fontFamily: "'DM Mono', monospace", color: "#f87171",
+                  }}>
+                    {bulkProgress.errors.map((e, i) => <div key={i}>{e}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              {bulkProgress?.done === bulkProgress?.total && bulkProgress?.done > 0 ? (
+                /* All done — show Dismiss */
+                <button onClick={() => { setBulkConsentModal(false); setBulkProgress(null); }} style={{
+                  background: "#10b981", border: "none", color: "#fff",
+                  padding: "8px 24px", borderRadius: 6, cursor: "pointer", fontWeight: 700,
+                  boxShadow: "0 0 10px #10b98155",
+                }}>Dismiss ✕</button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setBulkConsentModal(false); setBulkProgress(null); }}
+                    disabled={bulkProgress !== null && bulkProgress.done < bulkProgress.total}
+                    style={{
+                      background: "transparent", border: `1px solid ${T.border}`, color: T.subtext,
+                      padding: "8px 20px", borderRadius: 6,
+                      cursor: (bulkProgress !== null && bulkProgress.done < bulkProgress.total) ? "not-allowed" : "pointer",
+                      fontWeight: 600, opacity: (bulkProgress !== null && bulkProgress.done < bulkProgress.total) ? 0.4 : 1,
+                    }}
+                  >Cancel</button>
+                  <button
+                    disabled={bulkProgress !== null && bulkProgress.done < bulkProgress.total}
+                    onClick={handleBulkApply}
+                    style={{
+                      background: (bulkProgress !== null && bulkProgress.done < bulkProgress.total) ? "#6b7280" : "#8b5cf6",
+                      border: "none", color: "#fff", padding: "8px 24px", borderRadius: 6,
+                      cursor: (bulkProgress !== null && bulkProgress.done < bulkProgress.total) ? "not-allowed" : "pointer",
+                      fontWeight: 700, boxShadow: "0 0 10px #8b5cf655",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    {(bulkProgress !== null && bulkProgress.done < bulkProgress.total) && <PulseDot color="#fff" />}
+                    {(bulkProgress !== null && bulkProgress.done < bulkProgress.total) ? "Applying…" : "✅ Consent & Execute All"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
