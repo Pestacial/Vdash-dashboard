@@ -293,6 +293,7 @@ export default function App() {
   const [applyingFix, setApplyingFix] = useState(false);   // true while fetch is in flight
   const [bulkConsentModal, setBulkConsentModal] = useState(false); // "fix all" modal
   const [bulkProgress, setBulkProgress] = useState(null);  // { done, total, errors[] }
+  const [appliedFixes, setAppliedFixes] = useState({}); // Track which fixes have been applied: { "CVE-XXXX|pkg": true }
 
   const pollTimerRef = useRef(null);
   const aiPollRef = useRef(null);
@@ -428,6 +429,9 @@ export default function App() {
   const handleBulkApply = async () => {
     if (uniqueAiFixes.length === 0) return;
     setBulkProgress({ done: 0, total: uniqueAiFixes.length, errors: [] });
+    
+    const newAppliedFixes = { ...appliedFixes };
+
     for (let i = 0; i < uniqueAiFixes.length; i++) {
       const fix = uniqueAiFixes[i];
       try {
@@ -437,6 +441,13 @@ export default function App() {
           body: JSON.stringify({ command: fix.command }),
         });
         const data = await res.json();
+        
+        // Mark fix as applied if successful
+        if (data.success) {
+          const fixKey = `${fix.cve}|${fix.pkg.trim()}`;
+          newAppliedFixes[fixKey] = true;
+        }
+        
         setBulkProgress(prev => ({
           done: i + 1,
           total: prev.total,
@@ -450,6 +461,9 @@ export default function App() {
         }));
       }
     }
+    
+    // Update all applied fixes at once after loop completes
+    setAppliedFixes(newAppliedFixes);
   };
 
   useEffect(() => { setPage(1); }, [severityFilter, searchQuery, activeView, pageSize, sortCol, sortDir]);
@@ -603,7 +617,7 @@ export default function App() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "nowrap", overflow: "hidden" }}>
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600, color: T.accent, letterSpacing: 2, flexShrink: 0 }}>
-            ▸ VULNDASH
+            ▸ Vdash
           </span>
           <div style={{ width: 1, height: 24, background: T.border, flexShrink: 0 }} />
 
@@ -764,7 +778,7 @@ export default function App() {
               boxShadow: "0 0 14px #8b5cf655", whiteSpace: "nowrap"
             }}
           >
-            {aiLoading ? "🧠 Thinking..." : "🤖 Remediate with AI"}
+            {aiLoading ? "🧠 Thinking..." : "🤖 AI Remediate"}
           </button>
 
           {aiFixes.length > 0 && (
@@ -918,6 +932,23 @@ export default function App() {
                         const vPkgName = v.pkg.split(' (')[0];
                         const fix = aiFixes.find(f => f.cve === v.id && f.pkg.trim() === vPkgName);
                         if (fix) {
+                          const fixKey = `${fix.cve}|${fix.pkg.trim()}`;
+                          const isApplied = appliedFixes[fixKey];
+                          
+                          if (isApplied) {
+                            // Show applied state
+                            return (
+                              <span 
+                                title="Fix has been applied"
+                                style={{
+                                  background: "#052e16", border: "1px solid #166534", color: "#4ade80",
+                                  padding: "2px 6px", borderRadius: 4, fontSize: 14, fontWeight: 700,
+                                  display: "inline-block", boxShadow: "0 0 8px #4ade8055"
+                                }}
+                              >✓ Applied</span>
+                            );
+                          }
+                          
                           return (
                             <button 
                               onClick={(e) => { e.stopPropagation(); setConsentModal(fix); setApplyStatus(null); setApplyingFix(false); }}
@@ -1130,6 +1161,12 @@ export default function App() {
                         });
                         const data = await res.json();
                         setApplyStatus(data);
+                        
+                        // Mark this fix as applied if successful
+                        if (data.success && consentModal) {
+                          const fixKey = `${consentModal.cve}|${consentModal.pkg.trim()}`;
+                          setAppliedFixes(prev => ({ ...prev, [fixKey]: true }));
+                        }
                       } catch (e) {
                         setApplyStatus({ success: false, error: e.message });
                       } finally {
