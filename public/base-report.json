@@ -1,10 +1,10 @@
 {
-  "scanDate": "2026-06-20T14:50:02.096369+00:00",
+  "scanDate": "2026-06-20T16:37:51.925777+00:00",
   "container": "sandbox-opensilex-docker-opensilexapp",
   "results": {
     "SchemaVersion": 2,
-    "CreatedAt": "2026-06-20T16:50:01.990950456+02:00",
-    "ArtifactName": "/tmp/trivy-rootfs-cxo54_vj/rootfs",
+    "CreatedAt": "2026-06-20T18:37:51.823047374+02:00",
+    "ArtifactName": "/tmp/trivy-rootfs-ndu7ct56/rootfs",
     "ArtifactType": "filesystem",
     "Metadata": {
       "OS": {
@@ -14,7 +14,7 @@
     },
     "Results": [
       {
-        "Target": "/tmp/trivy-rootfs-cxo54_vj/rootfs (ubuntu 24.04)",
+        "Target": "/tmp/trivy-rootfs-ndu7ct56/rootfs (ubuntu 24.04)",
         "Class": "os-pkgs",
         "Type": "ubuntu",
         "Vulnerabilities": [
@@ -2499,7 +2499,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -2553,7 +2553,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.8",
@@ -2606,7 +2606,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.8",
@@ -2662,7 +2662,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -2715,7 +2715,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -2764,7 +2764,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -2809,7 +2809,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -2863,7 +2863,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.8",
@@ -2912,7 +2912,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -2968,7 +2968,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -3025,7 +3025,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -3079,7 +3079,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -3135,7 +3135,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.7",
@@ -3191,7 +3191,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.8",
@@ -3248,7 +3248,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -3298,7 +3298,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -3351,7 +3351,7 @@
             "PkgName": "libcurl4t64",
             "PkgIdentifier": {
               "PURL": "pkg:deb/ubuntu/libcurl4t64@8.5.0-2ubuntu10.6?arch=amd64&distro=ubuntu-24.04",
-              "UID": "a0865c70414dba22"
+              "UID": "ebca0f894bb33f79"
             },
             "InstalledVersion": "8.5.0-2ubuntu10.6",
             "FixedVersion": "8.5.0-2ubuntu10.9",
@@ -6398,674 +6398,6 @@
             ],
             "PublishedDate": "2025-09-08T15:15:38.18Z",
             "LastModifiedDate": "2026-04-15T00:35:42.02Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-0964",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-0964",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: Improper sanitation of paths received from SCP servers",
-            "Description": "A malicious SCP server can send unexpected paths that could make the\nclient application override local files outside of working directory.\nThis could be misused to create malicious executable or configuration\nfiles and make the user execute them under specific consequences.\n\nThis is the same issue as in OpenSSH, tracked as CVE-2019-6111.",
-            "Severity": "MEDIUM",
-            "CweIDs": [
-              "CWE-22"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 2,
-              "azure": 2,
-              "nvd": 2,
-              "redhat": 2,
-              "rocky": 2,
-              "ubuntu": 2
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:L",
-                "V3Score": 6.3
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.0/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:L",
-                "V3Score": 5
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18160",
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2026-0964",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-0964",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2026-0964",
-              "https://www.libssh.org/2026/02/10/libssh-0-12-0-and-0-11-4-security-releases/",
-              "https://www.libssh.org/security/advisories/CVE-2026-0964.txt"
-            ],
-            "PublishedDate": "2026-03-26T21:17:00.393Z",
-            "LastModifiedDate": "2026-05-19T14:16:32.177Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-0967",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-0967",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: libssh: Denial of Service via inefficient regular expression processing",
-            "Description": "A flaw was found in libssh. A remote attacker, by controlling client configuration files or known_hosts files, could craft specific hostnames that when processed by the `match_pattern()` function can lead to inefficient regular expression backtracking. This can cause timeouts and resource exhaustion, resulting in a Denial of Service (DoS) for the client.",
-            "Severity": "MEDIUM",
-            "CweIDs": [
-              "CWE-1333"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 2,
-              "azure": 1,
-              "nvd": 2,
-              "redhat": 1,
-              "rocky": 2,
-              "ubuntu": 2
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
-                "V3Score": 5.5
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.0/AV:L/AC:H/PR:L/UI:R/S:U/C:N/I:N/A:L",
-                "V3Score": 2.2
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18160",
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2026-0967",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-0967",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2026-0967",
-              "https://www.libssh.org/2026/02/10/libssh-0-12-0-and-0-11-4-security-releases/",
-              "https://www.libssh.org/security/advisories/CVE-2026-0967.txt"
-            ],
-            "PublishedDate": "2026-03-26T21:17:00.97Z",
-            "LastModifiedDate": "2026-05-19T14:16:36.72Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-0968",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-0968",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: libssh: Denial of Service due to malformed SFTP message",
-            "Description": "A flaw was found in libssh in which a malicious SFTP (SSH File Transfer Protocol) server can exploit this by sending a malformed 'longname' field within an `SSH_FXP_NAME` message during a file listing operation. This missing null check can lead to reading beyond allocated memory on the heap. This can cause unexpected behavior or lead to a denial of service (DoS) due to application crashes.",
-            "Severity": "MEDIUM",
-            "CweIDs": [
-              "CWE-476"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 2,
-              "azure": 1,
-              "nvd": 1,
-              "redhat": 1,
-              "rocky": 2,
-              "ubuntu": 2
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:N/I:N/A:L",
-                "V3Score": 3.1
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:N/I:N/A:L",
-                "V3Score": 3.1
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18160",
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2026-0968",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-0968",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2026-0968",
-              "https://www.libssh.org/2026/02/10/libssh-0-12-0-and-0-11-4-security-releases/",
-              "https://www.libssh.org/security/advisories/CVE-2026-0968.txt"
-            ],
-            "PublishedDate": "2026-03-26T21:17:01.15Z",
-            "LastModifiedDate": "2026-05-19T14:16:38.457Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-3731",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.4",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-3731",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: libssh: Denial of Service via out-of-bounds read in SFTP extension name handler",
-            "Description": "A weakness has been identified in libssh up to 0.11.3. The impacted element is the function sftp_extensions_get_name/sftp_extensions_get_data of the file src/sftp.c of the component SFTP Extension Name Handler. Executing a manipulation of the argument idx can lead to out-of-bounds read. The attack may be performed from remote. Upgrading to version 0.11.4 and 0.12.0 is sufficient to resolve this issue. This patch is called 855a0853ad3abd4a6cd85ce06fce6d8d4c7a0b60. You should upgrade the affected component.",
-            "Severity": "MEDIUM",
-            "CweIDs": [
-              "CWE-119",
-              "CWE-125"
-            ],
-            "VendorSeverity": {
-              "amazon": 2,
-              "azure": 2,
-              "nvd": 3,
-              "redhat": 2,
-              "ubuntu": 2
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
-                "V3Score": 7.5
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
-                "V3Score": 5.3
-              }
-            },
-            "References": [
-              "https://access.redhat.com/security/cve/CVE-2026-3731",
-              "https://gitlab.com/libssh/libssh-mirror/-/commit/855a0853ad3abd4a6cd85ce06fce6d8d4c7a0b60",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-3731",
-              "https://ubuntu.com/security/notices/USN-8093-1",
-              "https://vuldb.com/?ctiid.349709",
-              "https://vuldb.com/?id.349709",
-              "https://vuldb.com/?submit.767120",
-              "https://www.cve.org/CVERecord?id=CVE-2026-3731",
-              "https://www.libssh.org/files/0.12/libssh-0.12.0.tar.xz",
-              "https://www.libssh.org/security/advisories/libssh-2026-sftp-extensions.txt"
-            ],
-            "PublishedDate": "2026-03-08T11:15:50.307Z",
-            "LastModifiedDate": "2026-03-12T19:02:31.637Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2025-8114",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.2",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-8114",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: NULL Pointer Dereference in libssh KEX Session ID Calculation",
-            "Description": "A flaw was found in libssh, a library that implements the SSH protocol. When calculating the session ID during the key exchange (KEX) process, an allocation failure in cryptographic functions may lead to a NULL pointer dereference. This issue can cause the client or server to crash.",
-            "Severity": "LOW",
-            "CweIDs": [
-              "CWE-476"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 2,
-              "azure": 2,
-              "cbl-mariner": 2,
-              "nvd": 2,
-              "redhat": 2,
-              "rocky": 2,
-              "ubuntu": 1
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:H",
-                "V3Score": 4.7
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:H",
-                "V3Score": 4.7
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2025-8114",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://git.libssh.org/projects/libssh.git/commit/?id=53ac23ded4cb2c5463f6c4cd1525331bd578812d",
-              "https://git.libssh.org/projects/libssh.git/commit/?id=65f363c9",
-              "https://nvd.nist.gov/vuln/detail/CVE-2025-8114",
-              "https://ubuntu.com/security/notices/USN-7849-1",
-              "https://www.cve.org/CVERecord?id=CVE-2025-8114",
-              "https://www.libssh.org/security/advisories/CVE-2025-8114.txt"
-            ],
-            "PublishedDate": "2025-07-24T15:15:27.117Z",
-            "LastModifiedDate": "2026-05-19T14:16:28.97Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2025-8277",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-8277",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: Memory Exhaustion via Repeated Key Exchange in libssh",
-            "Description": "A flaw was found in libssh's handling of key exchange (KEX) processes when a client repeatedly sends incorrect KEX guesses. The library fails to free memory during these rekey operations, which can gradually exhaust system memory. This issue can lead to crashes on the client side, particularly when using libgcrypt, which impacts application stability and availability.",
-            "Severity": "LOW",
-            "CweIDs": [
-              "CWE-401"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 2,
-              "azure": 1,
-              "cbl-mariner": 1,
-              "redhat": 1,
-              "rocky": 2,
-              "ubuntu": 1
-            },
-            "CVSS": {
-              "redhat": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L",
-                "V3Score": 3.1
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2025-8277",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2025-8277",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2025-8277",
-              "https://www.libssh.org/security/advisories/CVE-2025-8277.txt"
-            ],
-            "PublishedDate": "2025-09-09T12:15:30.677Z",
-            "LastModifiedDate": "2026-05-19T14:16:29.15Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-0965",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-0965",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: libssh: Denial of Service via improper configuration file handling",
-            "Description": "A flaw was found in libssh where it can attempt to open arbitrary files during configuration parsing. A local attacker can exploit this by providing a malicious configuration file or when the system is misconfigured. This vulnerability could lead to a Denial of Service (DoS) by causing the system to try and access dangerous files, such as block devices or large system files, which can disrupt normal operations.",
-            "Severity": "LOW",
-            "CweIDs": [
-              "CWE-73"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "azure": 1,
-              "redhat": 1,
-              "rocky": 2,
-              "ubuntu": 1
-            },
-            "CVSS": {
-              "redhat": {
-                "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
-                "V3Score": 3.3
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18160",
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/security/cve/CVE-2026-0965",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-0965",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2026-0965",
-              "https://www.libssh.org/security/advisories/CVE-2026-0965.txt"
-            ],
-            "PublishedDate": "2026-03-26T21:17:00.607Z",
-            "LastModifiedDate": "2026-05-19T14:16:33.803Z"
-          },
-          {
-            "VulnerabilityID": "CVE-2026-0966",
-            "PkgID": "libssh-4@0.10.6-2ubuntu0.1",
-            "PkgName": "libssh-4",
-            "PkgIdentifier": {
-              "PURL": "pkg:deb/ubuntu/libssh-4@0.10.6-2ubuntu0.1?arch=amd64&distro=ubuntu-24.04",
-              "UID": "19308aa2cf976614"
-            },
-            "InstalledVersion": "0.10.6-2ubuntu0.1",
-            "FixedVersion": "0.10.6-2ubuntu0.3",
-            "Status": "fixed",
-            "SeveritySource": "ubuntu",
-            "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-0966",
-            "DataSource": {
-              "ID": "ubuntu",
-              "Name": "Ubuntu CVE Tracker",
-              "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
-            },
-            "Title": "libssh: libssh: Denial of Service via zero-length input in ssh_get_hexa()",
-            "Description": "A flaw was found in libssh. The API function `ssh_get_hexa()` is vulnerable to a denial of service when processing zero-length input. This can be exploited remotely by an attacker during GSSAPI (Generic Security Service Application Program Interface) authentication if the server's logging verbosity is set to `SSH_LOG_PACKET (3)` or higher. Successful exploitation could lead to a self-Denial of Service of the per-connection daemon process.",
-            "Severity": "LOW",
-            "CweIDs": [
-              "CWE-124"
-            ],
-            "VendorSeverity": {
-              "alma": 2,
-              "amazon": 3,
-              "azure": 2,
-              "nvd": 3,
-              "redhat": 2,
-              "rocky": 2,
-              "ubuntu": 1
-            },
-            "CVSS": {
-              "nvd": {
-                "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:H",
-                "V3Score": 8.2
-              },
-              "redhat": {
-                "V3Vector": "CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:H",
-                "V3Score": 6.5
-              }
-            },
-            "References": [
-              "https://access.redhat.com/errata/RHSA-2026:18160",
-              "https://access.redhat.com/errata/RHSA-2026:18683",
-              "https://access.redhat.com/errata/RHSA-2026:7067",
-              "https://access.redhat.com/security/cve/CVE-2026-0966",
-              "https://bugzilla.redhat.com/2369367",
-              "https://bugzilla.redhat.com/2376184",
-              "https://bugzilla.redhat.com/2376193",
-              "https://bugzilla.redhat.com/2383220",
-              "https://bugzilla.redhat.com/2383888",
-              "https://bugzilla.redhat.com/2433121",
-              "https://bugzilla.redhat.com/2436979",
-              "https://bugzilla.redhat.com/2436980",
-              "https://bugzilla.redhat.com/2436981",
-              "https://bugzilla.redhat.com/2436982",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2369367",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376184",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2376193",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383220",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2383888",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2433121",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436979",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436980",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436981",
-              "https://bugzilla.redhat.com/show_bug.cgi?id=2436982",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4877",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-4878",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-5351",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8114",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-8277",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0964",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0965",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0966",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0967",
-              "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-0968",
-              "https://errata.almalinux.org/9/ALSA-2026-18683.html",
-              "https://errata.rockylinux.org/RLSA-2026:18683",
-              "https://nvd.nist.gov/vuln/detail/CVE-2026-0966",
-              "https://ubuntu.com/security/notices/USN-8051-1",
-              "https://ubuntu.com/security/notices/USN-8051-2",
-              "https://www.cve.org/CVERecord?id=CVE-2026-0966",
-              "https://www.libssh.org/2026/02/10/libssh-0-12-0-and-0-11-4-security-releases/",
-              "https://www.libssh.org/security/advisories/CVE-2026-0966.txt"
-            ],
-            "PublishedDate": "2026-03-26T21:17:00.783Z",
-            "LastModifiedDate": "2026-05-19T14:16:36.26Z"
           },
           {
             "VulnerabilityID": "CVE-2026-45447",
