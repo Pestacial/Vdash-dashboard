@@ -8,7 +8,7 @@ executes Trivy locally, writes both report files, and git-pushes to GitHub
 so Vercel auto-deploys.
 
 Security:
-  - Only listens on the Tailscale interface (100.95.217.28) — not public internet.
+  - Only listens on the Tailscale interface (YOUR_SERVER_IP) — not public internet.
   - Requires a shared secret token in the Authorization header.
   - Rate-limited: ignores requests if a scan is already running.
 
@@ -24,10 +24,10 @@ Setup on Kali:
 
 Dashboard usage:
   The React dashboard calls:
-    POST http://100.95.217.28:5000/scan
+    POST http://YOUR_SERVER_IP:5000/scan # replace with your IP
     Authorization: Bearer <SCAN_TOKEN>
   And polls:
-    GET  http://100.95.217.28:5000/status
+    GET  http://YOUR_SERVER_IP:5000/status # replace with your IP
 
 CORS:
   Configured to accept requests from your Vercel dashboard URL.
@@ -55,10 +55,10 @@ CORS:
 #
 #    [Service]
 #    Type=simple
-#    User=pasta
-#    WorkingDirectory=/home/pasta/vuln-dashboard
+#    User=your_username
+#    WorkingDirectory=/home/your_username/vuln-dashboard
 #    Environment="SCAN_TOKEN=YOUR_SECRET_TOKEN_HERE"
-#    ExecStart=/usr/bin/python3 /home/pasta/vuln-dashboard/scan_server.py
+#    ExecStart=/usr/bin/python3 /home/your_username/vuln-dashboard/scan_server.py
 #    Restart=on-failure
 #    RestartSec=5
 #

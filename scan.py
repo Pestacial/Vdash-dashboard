@@ -3,7 +3,7 @@
 scan.py — Trivy scan runner for PHIS / OpenSILEX containers
 
 Runs Trivy against the target Docker container, generates an HTML report
-matching the base-report.html format (theme_script.py), and drops it into public/base-report.html.
+matching the base-report.html (format in line 61), and drops it into public/base-report.html.
 
 Usage:
     python3 scan.py [options]
