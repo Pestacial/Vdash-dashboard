@@ -1,3 +1,9 @@
+
+// To be honest, I'm not fond of development so, this dashboard design and frontend was mostly by Claude AI, I only made sure
+// that the technical aspect works as intended and the most important blocks related to the ai remediation
+// and autoscan work as intended. there could be some minor bugs but they weren't priority
+// I only cared for the main functionalities that I needed to work.   
+
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 const SCAN_SERVER_URL = "https://100.95.217.28:5000";
@@ -551,7 +557,8 @@ export default function App() {
         parsed = parseTrivyHtml(content);
       }
 
-      // Uploaded is ALWAYS older. Base is ALWAYS newer.
+      // This section is for the file upload logic, you are meant to upload an older report for it to work properly.
+      //  Uploaded is ALWAYS older. Base is ALWAYS newer.
       // Patched = exists in uploaded, but MISSING from base.
       const baseKeys = new Set(baseVulns.map(v => `${v.id}|${normalizePkg(v.pkg)}`));
       setPatchStatus((prev) => {

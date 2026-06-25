@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scan_server.py — Webhook server for the VULNDASH autoscan feature.
+scan_server.py — Webhook server for the Vdash autoscan feature.
 
 Runs on Kali as a systemd service. The React dashboard's "Autoscan" button
 sends a POST /scan request to this server. The server runs scan.py, which
@@ -33,6 +33,48 @@ CORS:
   Configured to accept requests from your Vercel dashboard URL.
   Update ALLOWED_ORIGIN below if your Vercel URL changes.
 """
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SYSTEMD SERVICE SETUP
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# 1. Install Flask:
+#      pip3 install flask --break-system-packages
+#
+# 2. Generate a token and save it somewhere safe:
+#      python3 -c "import secrets; print(secrets.token_hex(32))"
+#
+# 3. Create the service file:
+#      sudo nano /etc/systemd/system/vdash-scan.service
+#
+#    Paste this (update the token and path as needed):
+#
+#    [Unit]
+#    Description=Vdash Trivy Scan Webhook Server
+#    After=network.target
+#
+#    [Service]
+#    Type=simple
+#    User=pasta
+#    WorkingDirectory=/home/pasta/vuln-dashboard
+#    Environment="SCAN_TOKEN=YOUR_SECRET_TOKEN_HERE"
+#    ExecStart=/usr/bin/python3 /home/pasta/vuln-dashboard/scan_server.py
+#    Restart=on-failure
+#    RestartSec=5
+#
+#    [Install]
+#    WantedBy=multi-user.target
+#
+# 4. Enable and start:
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable vulndash-scan
+#      sudo systemctl start vulndash-scan
+#      sudo systemctl status vulndash-scan
+#
+# 5. Check logs:
+#      sudo journalctl -u vulndash-scan -f
+#
+# ══════════════════════════════════════════════════════════════════════════════
 
 import os
 import json
@@ -72,9 +114,8 @@ ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "https://vuln-dashboard.vercel
 LOG_TTL = 300
 
 # AI remediation batch size — how many CVEs to send to Ollama per request.
-# Keeping this at 10 gives qwen2.5:7b enough room to return clean JSON
-# without truncating or garbling the output. The worker loops until all
-# vulnerabilities are processed.
+# This was changed from 15 to 10, Keeping this at 10 gives qwen2.5:7b enough room to return clean JSON
+# without truncating or garbling the output. The worker loops until all vulnerabilities are processed.
 REMEDIATION_BATCH_SIZE = 10
 
 # ── State ──────────────────────────────────────────────────────────────────────
@@ -266,7 +307,7 @@ def _build_prompt(container: str, vulns: list) -> str:
         for i, v in enumerate(vulns)
     )
     # Two concrete examples make qwen far more likely to return a full array
-    # rather than collapsing the whole batch into a single object.
+    # rather than collapsing the whole batch into a single object, because ai can be stupid just like that.
     return f"""You are a Linux sysadmin fixing vulnerabilities in a Debian-based Docker container.
 Container: {container}
 
@@ -297,6 +338,8 @@ def _run_remediate_background(vulns_for_ai: list, container: str):
     global _remediate_running, _remediate_result, _remediate_progress
 
     # ── Deduplicate by CVE + base package name ──────────────────────
+    # this saves time a lot and its more efficient to patch many vulnerabilities in one command
+    #instead of one by one.
     seen = set()
     deduped = []
     for v in vulns_for_ai:
@@ -579,46 +622,3 @@ if __name__ == "__main__":
         threaded=True,
         ssl_context=(str(cert_file), str(key_file)),
     )
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SYSTEMD SERVICE SETUP
-# ══════════════════════════════════════════════════════════════════════════════
-#
-# 1. Install Flask:
-#      pip3 install flask --break-system-packages
-#
-# 2. Generate a token and save it somewhere safe:
-#      python3 -c "import secrets; print(secrets.token_hex(32))"
-#
-# 3. Create the service file:
-#      sudo nano /etc/systemd/system/vulndash-scan.service
-#
-#    Paste this (update the token and path as needed):
-#
-#    [Unit]
-#    Description=VulnDash Trivy Scan Webhook Server
-#    After=network.target
-#
-#    [Service]
-#    Type=simple
-#    User=pasta
-#    WorkingDirectory=/home/pasta/vuln-dashboard
-#    Environment="SCAN_TOKEN=YOUR_SECRET_TOKEN_HERE"
-#    ExecStart=/usr/bin/python3 /home/pasta/vuln-dashboard/scan_server.py
-#    Restart=on-failure
-#    RestartSec=5
-#
-#    [Install]
-#    WantedBy=multi-user.target
-#
-# 4. Enable and start:
-#      sudo systemctl daemon-reload
-#      sudo systemctl enable vulndash-scan
-#      sudo systemctl start vulndash-scan
-#      sudo systemctl status vulndash-scan
-#
-# 5. Check logs:
-#      sudo journalctl -u vulndash-scan -f
-#
-# ══════════════════════════════════════════════════════════════════════════════

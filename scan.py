@@ -3,7 +3,7 @@
 scan.py — Trivy scan runner for PHIS / OpenSILEX containers
 
 Runs Trivy against the target Docker container, generates an HTML report
-matching the base-report.html format, and drops it into public/base-report.html.
+matching the base-report.html format (theme_script.py), and drops it into public/base-report.html.
 
 Usage:
     python3 scan.py [options]
@@ -58,7 +58,8 @@ DEFAULT_CONTAINER = "sandbox-opensilex-docker-opensilexapp"
 # Severity levels to include (ordered from most to least severe)
 ALL_SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NEGLIGIBLE"]
 
-# ── HTML template matching base-report.html exactly ───────────────────────────
+# ────────────────── HTML template matching base-report.html, comment this section off and use your own
+#  if App.jsx was optimized to handle more formats ──────────────────
 
 HTML_HEAD = """\
 <html><head><style>
@@ -255,6 +256,7 @@ def build_html(vulns: list[dict], container: str, scan_dt: datetime) -> str:
 
 # ── Git helpers ────────────────────────────────────────────────────────────────
 
+# this part was added due to inconsistencies when pushing from 2 or more seperate machines, this makes sure the automated push works consistently.
 def git_push(output_path: Path):
     """Add, commit and push the updated report file."""
     rel = str(output_path)
@@ -277,7 +279,7 @@ def git_push(output_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run Trivy and generate a base-report.html for the VULNDASH dashboard.",
+        description="Run Trivy and generate a base-report.html for the Vdash dashboard.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
             Examples:
