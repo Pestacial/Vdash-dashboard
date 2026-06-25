@@ -48,9 +48,9 @@ from pathlib import Path
 # Set to False when this script runs directly on Kali (called by scan_server.py)
 SCAN_ON_KALI = False
 
-SSH_HOST = "100.95.217.28"          # Kali Tailscale IP (only used if SCAN_ON_KALI = True)
-SSH_USER = "pasta"
-SSH_KEY  = "/home/pasta/.ssh/id_ed25519"  # Linux path (only used if SCAN_ON_KALI = True)
+SSH_HOST = os.environ.get("SSH_HOST", "YOUR_SERVER_IP")      # change to your ip (Kali Tailscale IP, only used if SCAN_ON_KALI = True)
+SSH_USER = os.environ.get("SSH_USER", "your_username")        # change to your username
+SSH_KEY  = os.environ.get("SSH_KEY", "~/.ssh/id_ed25519")    # (only used if SCAN_ON_KALI = True)
 
 # Default container to scan
 DEFAULT_CONTAINER = "sandbox-opensilex-docker-opensilexapp"

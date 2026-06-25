@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
-const SCAN_SERVER_URL = "https://100.95.217.28:5000";
+const SCAN_SERVER_URL = import.meta.env.VITE_SCAN_SERVER_URL; // used to be a tailscale ip "https://1xx.xx.xxx.xx:5000"
 const SCAN_TOKEN = import.meta.env.VITE_SCAN_TOKEN || "CHANGE_ME";
 
 function normalizePkg(pkg) {

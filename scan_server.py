@@ -103,7 +103,7 @@ SCAN_TOKEN = os.environ.get("SCAN_TOKEN", "CHANGE_ME_USE_A_REAL_SECRET")
 SCAN_SCRIPT = Path(__file__).parent / "scan.py"
 
 # Only listen on the Tailscale IP — never 0.0.0.0 in production.
-LISTEN_HOST = "100.95.217.28"
+LISTEN_HOST = os.environ.get("SCAN_SERVER_HOST", "YOUR_SERVER_IP") # "or just hardcode an ip if you want and adapt SSH_HOST= in scan.py to it"
 LISTEN_PORT = 5000
 
 # Your Vercel dashboard URL (for CORS).
@@ -613,8 +613,9 @@ if __name__ == "__main__":
     print(f"[server] Batch size    : {REMEDIATION_BATCH_SIZE}")
     print(f"[server] Token set     : {'YES (custom)' if SCAN_TOKEN != 'CHANGE_ME_USE_A_REAL_SECRET' else 'NO — SET IT!'}\n")
 
-    cert_file = Path(__file__).parent / "100.95.217.28.pem"
-    key_file  = Path(__file__).parent / "100.95.217.28-key.pem"
+    # This part was hardcoded so, if it doesn't work try to replace both with Path(__file__).parent / "YOUR_KEY-key.pem"
+    cert_file = Path(__file__).parent / "cert.pem"
+    key_file  = Path(__file__).parent / "key.pem"
     app.run(
         host=LISTEN_HOST,
         port=LISTEN_PORT,
